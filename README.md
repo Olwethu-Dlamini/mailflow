@@ -7,6 +7,7 @@ All company mailboxes in one place, each email sorted for customer service (**ty
 
 | Start here | What it is |
 |---|---|
+| [docs/AS-BUILT.md](docs/AS-BUILT.md) | What is running now: the as-built overview and a drawing of every live n8n workflow |
 | [docs/SYSTEM-DESIGN.md](docs/SYSTEM-DESIGN.md) | How it works, the data, the AI (with measured speeds), security, rollout, decisions |
 | [docs/WHAT-I-NEED.md](docs/WHAT-I-NEED.md) | Decisions and logins to collect before and during the build |
 | [docs/lessons/](docs/lessons/) | Step-by-step lessons for building it yourself in n8n, one working piece per lesson |

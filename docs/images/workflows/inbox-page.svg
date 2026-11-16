@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1170 254" font-family="Helvetica, Arial, sans-serif">
+<rect width="1170" height="254" fill="#ffffff"/>
+<text x="40" y="48" font-size="26" font-weight="bold" fill="#1f2937">MailFlow · Inbox page</text>
+<text x="40" y="76" font-size="14" fill="#6b7280">GET /webhook/mailflow (Basic Auth): reads 30 days of rows and builds the inbox page</text>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker></defs>
+<path d="M260,145.0 C295.0,145.0 295.0,145.0 328,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M550,145.0 C585.0,145.0 585.0,145.0 618,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M840,145.0 C875.0,145.0 875.0,145.0 908,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<rect x="40" y="110" width="220" height="70" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+<text x="52" y="138" font-size="15" font-weight="bold" fill="#111827">Webhook</text>
+<text x="52" y="160" font-size="12" fill="#4b5563">Webhook · GET /mailflow</text>
+<rect x="330" y="110" width="220" height="70" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+<text x="342" y="138" font-size="15" font-weight="bold" fill="#111827">Get emails</text>
+<text x="342" y="160" font-size="12" fill="#4b5563">Data Table · Get</text>
+<rect x="620" y="110" width="220" height="70" rx="10" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.5"/>
+<text x="632" y="138" font-size="15" font-weight="bold" fill="#111827">Build page</text>
+<text x="632" y="160" font-size="12" fill="#4b5563">Code</text>
+<rect x="910" y="110" width="220" height="70" rx="10" fill="#f0fdf4" stroke="#15803d" stroke-width="1.5"/>
+<text x="922" y="138" font-size="15" font-weight="bold" fill="#111827">Respond</text>
+<text x="922" y="160" font-size="12" fill="#4b5563">Respond to Webhook</text>
+</svg>

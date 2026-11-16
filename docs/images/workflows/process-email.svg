@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2910 462" font-family="Helvetica, Arial, sans-serif">
+<rect width="2910" height="462" fill="#ffffff"/>
+<text x="40" y="48" font-size="26" font-weight="bold" fill="#1f2937">MailFlow · Process email</text>
+<text x="40" y="76" font-size="14" fill="#6b7280">Skip empty and duplicate → rules (Marketing / Notification) or Mistral → save → Telegram alert for P1</text>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker></defs>
+<path d="M260,145.0 C295.0,145.0 295.0,145.0 328,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M840,145.0 C875.0,145.0 875.0,145.0 908,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M1130,145.0 C1165.0,145.0 1165.0,145.0 1198,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<text x="1136" y="137.0" font-size="12" font-weight="bold" fill="#b45309">true</text>
+<path d="M1130,145.0 C1165.0,145.0 1165.0,249.0 1198,249.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<text x="1136" y="165.0" font-size="12" font-weight="bold" fill="#b45309">false</text>
+<path d="M1130,145.0 C1165.0,145.0 1165.0,301.0 1200,301.0 L1420,301.0 C1455.0,301.0 1455.0,249.0 1488,249.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<text x="1136" y="165.0" font-size="12" font-weight="bold" fill="#b45309">false</text>
+<path d="M1420,249.0 C1455.0,249.0 1455.0,249.0 1488,249.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M1420,145.0 C1745.0,145.0 1745.0,145.0 2068,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M2000,249.0 C2035.0,249.0 2035.0,145.0 2068,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M2290,145.0 C2325.0,145.0 2325.0,145.0 2358,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M1710,249.0 C1745.0,249.0 1745.0,249.0 1778,249.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M550,145.0 C585.0,145.0 585.0,145.0 618,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M2580,145.0 C2615.0,145.0 2615.0,145.0 2648,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<text x="2586" y="137.0" font-size="12" font-weight="bold" fill="#b45309">true</text>
+<line x1="1310.0" y1="318" x2="1310.0" y2="286" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#a)"/>
+<rect x="40" y="110" width="220" height="70" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+<text x="52" y="138" font-size="15" font-weight="bold" fill="#111827">When Executed by Another …</text>
+<text x="52" y="160" font-size="12" fill="#4b5563">When Executed by Another Workflow</text>
+<rect x="330" y="110" width="220" height="70" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+<text x="342" y="138" font-size="15" font-weight="bold" fill="#111827">Has message id?</text>
+<text x="342" y="160" font-size="12" fill="#4b5563">Filter</text>
+<rect x="620" y="110" width="220" height="70" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+<text x="632" y="138" font-size="15" font-weight="bold" fill="#111827">Already saved?</text>
+<text x="632" y="160" font-size="12" fill="#4b5563">Data Table · If Row Does Not Exist</text>
+<rect x="910" y="110" width="220" height="70" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+<text x="922" y="138" font-size="15" font-weight="bold" fill="#111827">Obvious mail?</text>
+<text x="922" y="160" font-size="12" fill="#4b5563">If</text>
+<rect x="1200" y="110" width="220" height="70" rx="10" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.5"/>
+<text x="1212" y="138" font-size="15" font-weight="bold" fill="#111827">Rule tags</text>
+<text x="1212" y="160" font-size="12" fill="#4b5563">Edit Fields</text>
+<rect x="1200" y="214" width="220" height="70" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="1212" y="242" font-size="15" font-weight="bold" fill="#111827">Sort with AI</text>
+<text x="1212" y="264" font-size="12" fill="#4b5563">Information Extractor</text>
+<rect x="1490" y="214" width="220" height="70" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+<text x="1502" y="242" font-size="15" font-weight="bold" fill="#111827">Email + AI answer</text>
+<text x="1502" y="264" font-size="12" fill="#4b5563">Merge · by position</text>
+<rect x="1780" y="214" width="220" height="70" rx="10" fill="#f3f4f6" stroke="#6b7280" stroke-width="1.5"/>
+<text x="1792" y="242" font-size="15" font-weight="bold" fill="#111827">AI tags</text>
+<text x="1792" y="264" font-size="12" fill="#4b5563">Edit Fields</text>
+<rect x="2070" y="110" width="220" height="70" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+<text x="2082" y="138" font-size="15" font-weight="bold" fill="#111827">Save email</text>
+<text x="2082" y="160" font-size="12" fill="#4b5563">Data Table · Insert</text>
+<rect x="2360" y="110" width="220" height="70" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+<text x="2372" y="138" font-size="15" font-weight="bold" fill="#111827">P1?</text>
+<text x="2372" y="160" font-size="12" fill="#4b5563">If</text>
+<rect x="2650" y="110" width="220" height="70" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+<text x="2662" y="138" font-size="15" font-weight="bold" fill="#111827">Telegram alert</text>
+<text x="2662" y="160" font-size="12" fill="#4b5563">Telegram</text>
+<rect x="1200" y="318" width="220" height="70" rx="10" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.5"/>
+<text x="1212" y="346" font-size="15" font-weight="bold" fill="#111827">Ollama Chat Model</text>
+<text x="1212" y="368" font-size="12" fill="#4b5563">Ollama Chat Model</text>
+</svg>

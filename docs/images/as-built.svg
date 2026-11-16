@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 760" font-family="Helvetica, Arial, sans-serif">
+  <rect width="1400" height="760" fill="#ffffff"/>
+  <text x="40" y="48" font-size="28" font-weight="bold" fill="#1f2937">MailFlow as built (16 November 2026)</text>
+  <text x="40" y="76" font-size="15" fill="#6b7280">Solid = running in n8n on `ai`. Dashed = planned. Every box on the right is a webhook address behind the MailFlow page login.</text>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker></defs>
+
+  <!-- mailboxes -->
+  <text x="40" y="122" font-size="14" font-weight="bold" fill="#374151">MAILBOXES</text>
+  <rect x="40" y="136" width="230" height="74" rx="10" fill="#fee2e2" stroke="#ef4444"/>
+  <text x="56" y="164" font-size="15" font-weight="bold" fill="#1f2937">Gmail</text>
+  <text x="56" y="186" font-size="12" fill="#6b7280">IMAP imap.gmail.com:993</text>
+  <text x="56" y="202" font-size="12" fill="#6b7280">app password</text>
+  <rect x="40" y="226" width="230" height="74" rx="10" fill="#dcfce7" stroke="#22c55e"/>
+  <text x="56" y="254" font-size="15" font-weight="bold" fill="#1f2937">22112002.xyz (Stalwart)</text>
+  <text x="56" y="276" font-size="12" fill="#6b7280">IMAP 100.72.72.58:993 over Tailscale</text>
+  <text x="56" y="292" font-size="12" fill="#6b7280">(behind CGNAT, no public IMAP)</text>
+  <rect x="40" y="316" width="230" height="54" rx="10" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="6 4"/>
+  <text x="56" y="340" font-size="14" fill="#6b7280">Work mail (POP3, mail-poll)</text>
+  <text x="56" y="358" font-size="12" fill="#9ca3af">planned, lesson 3</text>
+  <rect x="40" y="380" width="230" height="54" rx="10" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="6 4"/>
+  <text x="56" y="404" font-size="14" fill="#6b7280">Microsoft 365</text>
+  <text x="56" y="422" font-size="12" fill="#9ca3af">planned, lesson 8</text>
+
+  <!-- collectors -->
+  <text x="320" y="122" font-size="14" font-weight="bold" fill="#374151">COLLECTORS</text>
+  <rect x="320" y="146" width="230" height="54" rx="10" fill="#f9fafb" stroke="#16a34a"/>
+  <text x="336" y="170" font-size="14" fill="#1f2937">From Gmail (IMAP)</text>
+  <text x="336" y="188" font-size="12" fill="#6b7280">since 16 Nov, leaves mail unread</text>
+  <rect x="320" y="236" width="230" height="54" rx="10" fill="#f9fafb" stroke="#16a34a"/>
+  <text x="336" y="260" font-size="14" fill="#1f2937">From 22112002 (IMAP)</text>
+  <text x="336" y="278" font-size="12" fill="#6b7280">since 16 Nov, leaves mail unread</text>
+  <line x1="270" y1="173" x2="316" y2="173" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="270" y1="263" x2="316" y2="263" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- process -->
+  <rect x="600" y="122" width="330" height="250" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text x="616" y="150" font-size="16" font-weight="bold" fill="#4c1d95">Process email</text>
+  <g font-size="13" fill="#1f2937">
+    <text x="616" y="178">1. skip empty runs and duplicates</text>
+    <text x="616" y="202">2. rules: newsletters → Marketing,</text>
+    <text x="634" y="220">no-reply → Notification (no AI)</text>
+    <text x="616" y="244">3. Mistral on `ai` (Information Extractor):</text>
+    <text x="634" y="262">type · priority P1-P3 · mood ·</text>
+    <text x="634" y="280">needs reply · summary · next step</text>
+    <text x="616" y="304">4. save the row (status open)</text>
+    <text x="616" y="328">5. P1 → Telegram alert</text>
+  </g>
+  <line x1="550" y1="173" x2="596" y2="200" stroke="#7c3aed" stroke-width="2" marker-end="url(#a)"/>
+  <line x1="550" y1="263" x2="596" y2="240" stroke="#7c3aed" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- table -->
+  <rect x="600" y="420" width="330" height="96" rx="12" fill="#ecfeff" stroke="#0891b2" stroke-width="2"/>
+  <text x="616" y="448" font-size="16" font-weight="bold" fill="#155e75">Data table: MailFlow emails</text>
+  <text x="616" y="472" font-size="12" fill="#1f2937">who, subject, text, type, priority, mood,</text>
+  <text x="616" y="490" font-size="12" fill="#1f2937">needs reply, summary, next step,</text>
+  <text x="616" y="508" font-size="12" fill="#1f2937">status open → waiting → done</text>
+  <line x1="765" y1="372" x2="765" y2="416" stroke="#0891b2" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- pages -->
+  <text x="990" y="122" font-size="14" font-weight="bold" fill="#374151">PAGES (n8n webhooks + login)</text>
+  <rect x="990" y="136" width="370" height="64" rx="10" fill="#f0fdf4" stroke="#16a34a"/>
+  <text x="1006" y="162" font-size="14" font-weight="bold" fill="#1f2937">Inbox page · GET /webhook/mailflow</text>
+  <text x="1006" y="184" font-size="12" fill="#6b7280">views: Needs reply, P1, Waiting, Done, Everything</text>
+  <rect x="990" y="216" width="370" height="64" rx="10" fill="#f0fdf4" stroke="#16a34a"/>
+  <text x="1006" y="242" font-size="14" font-weight="bold" fill="#1f2937">Email page · GET …/email, …/status</text>
+  <text x="1006" y="264" font-size="12" fill="#6b7280">one email, AI box, Waiting / Done / Reopen</text>
+  <rect x="990" y="296" width="370" height="64" rx="10" fill="#dbeafe" stroke="#2563eb"/>
+  <text x="1006" y="322" font-size="14" font-weight="bold" fill="#1f2937">Reply · POST …/reply (gmail mailbox)</text>
+  <text x="1006" y="344" font-size="12" fill="#6b7280">Gmail node: reply in the same thread → Waiting</text>
+  <path d="M930,468 C960,468 960,168 986,168" fill="none" stroke="#0891b2" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M930,480 C965,480 965,248 986,248" fill="none" stroke="#0891b2" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- reply out -->
+  <rect x="990" y="420" width="370" height="96" rx="10" fill="#fff7ed" stroke="#ea580c"/>
+  <text x="1006" y="446" font-size="14" font-weight="bold" fill="#9a3412">Gmail login (OAuth)</text>
+  <text x="1006" y="468" font-size="12" fill="#6b7280">Google Cloud project "MailFlow", test user,</text>
+  <text x="1006" y="486" font-size="12" fill="#6b7280">needs n8n on https://ai.tail653118.ts.net</text>
+  <text x="1006" y="504" font-size="12" fill="#6b7280">(N8N_EDITOR_BASE_URL + Tailscale Serve)</text>
+  <line x1="1175" y1="360" x2="1175" y2="416" stroke="#ea580c" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- planned side jobs -->
+  <text x="40" y="490" font-size="14" font-weight="bold" fill="#374151">PLANNED</text>
+  <rect x="40" y="504" width="230" height="46" rx="10" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="6 4"/>
+  <text x="56" y="532" font-size="13" fill="#6b7280">Errors → Telegram (lesson 9)</text>
+  <rect x="40" y="560" width="230" height="46" rx="10" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="6 4"/>
+  <text x="56" y="588" font-size="13" fill="#6b7280">Nightly cleanup, 90 days (lesson 9)</text>
+  <rect x="320" y="504" width="230" height="46" rx="10" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="6 4"/>
+  <text x="336" y="532" font-size="13" fill="#6b7280">Replies for 22112002 mailbox</text>
+  <rect x="320" y="560" width="230" height="46" rx="10" fill="#ffffff" stroke="#9ca3af" stroke-dasharray="6 4"/>
+  <text x="336" y="588" font-size="13" fill="#6b7280">Pages Tailscale-only (Caddy)</text>
+
+  <rect x="40" y="640" width="1320" height="80" rx="10" fill="#f9fafb" stroke="#e5e7eb"/>
+  <text x="60" y="670" font-size="14" fill="#374151">Each workflow is drawn node by node from its n8n export in docs/images/workflows/ (see AS-BUILT.md).</text>
+  <text x="60" y="696" font-size="14" fill="#374151">Workflow files are backed up in the private n8n-chatbot repo, folder mailflow/; this public repo holds no logins or email content.</text>
+</svg>

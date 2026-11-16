@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2330 358" font-family="Helvetica, Arial, sans-serif">
+<rect width="2330" height="358" fill="#ffffff"/>
+<text x="40" y="48" font-size="26" font-weight="bold" fill="#1f2937">MailFlow · Reply</text>
+<text x="40" y="76" font-size="14" fill="#6b7280">POST /webhook/mailflow/reply: finds the email in Gmail, replies in the same thread, sets Waiting</text>
+<defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker></defs>
+<path d="M260,145.0 C295.0,145.0 295.0,145.0 328,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M550,145.0 C585.0,145.0 585.0,145.0 618,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M840,145.0 C875.0,145.0 875.0,145.0 908,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<text x="846" y="137.0" font-size="12" font-weight="bold" fill="#b45309">true</text>
+<path d="M840,145.0 C875.0,145.0 875.0,249.0 908,249.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<text x="846" y="165.0" font-size="12" font-weight="bold" fill="#b45309">false</text>
+<path d="M1130,145.0 C1165.0,145.0 1165.0,145.0 1198,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M1420,145.0 C1455.0,145.0 1455.0,145.0 1488,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<text x="1426" y="137.0" font-size="12" font-weight="bold" fill="#b45309">true</text>
+<path d="M1420,145.0 C1455.0,145.0 1455.0,249.0 1488,249.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<text x="1426" y="165.0" font-size="12" font-weight="bold" fill="#b45309">false</text>
+<path d="M1710,145.0 C1745.0,145.0 1745.0,145.0 1778,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<path d="M2000,145.0 C2035.0,145.0 2035.0,145.0 2068,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
+<rect x="40" y="110" width="220" height="70" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+<text x="52" y="138" font-size="15" font-weight="bold" fill="#111827">Reply webhook</text>
+<text x="52" y="160" font-size="12" fill="#4b5563">Webhook · POST /mailflow/reply</text>
+<rect x="330" y="110" width="220" height="70" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+<text x="342" y="138" font-size="15" font-weight="bold" fill="#111827">Get email</text>
+<text x="342" y="160" font-size="12" fill="#4b5563">Data Table · Get</text>
+<rect x="620" y="110" width="220" height="70" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+<text x="632" y="138" font-size="15" font-weight="bold" fill="#111827">Can reply?</text>
+<text x="632" y="160" font-size="12" fill="#4b5563">If</text>
+<rect x="910" y="110" width="220" height="70" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+<text x="922" y="138" font-size="15" font-weight="bold" fill="#111827">Find in Gmail</text>
+<text x="922" y="160" font-size="12" fill="#4b5563">Gmail · Get Many</text>
+<rect x="910" y="214" width="220" height="70" rx="10" fill="#f0fdf4" stroke="#15803d" stroke-width="1.5"/>
+<text x="922" y="242" font-size="15" font-weight="bold" fill="#111827">Respond cannot</text>
+<text x="922" y="264" font-size="12" fill="#4b5563">Respond to Webhook</text>
+<rect x="1200" y="110" width="220" height="70" rx="10" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+<text x="1212" y="138" font-size="15" font-weight="bold" fill="#111827">Found?</text>
+<text x="1212" y="160" font-size="12" fill="#4b5563">If</text>
+<rect x="1490" y="110" width="220" height="70" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+<text x="1502" y="138" font-size="15" font-weight="bold" fill="#111827">Send reply</text>
+<text x="1502" y="160" font-size="12" fill="#4b5563">Gmail · Reply</text>
+<rect x="1490" y="214" width="220" height="70" rx="10" fill="#f0fdf4" stroke="#15803d" stroke-width="1.5"/>
+<text x="1502" y="242" font-size="15" font-weight="bold" fill="#111827">Respond not found</text>
+<text x="1502" y="264" font-size="12" fill="#4b5563">Respond to Webhook</text>
+<rect x="1780" y="110" width="220" height="70" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-width="1.5"/>
+<text x="1792" y="138" font-size="15" font-weight="bold" fill="#111827">Set waiting</text>
+<text x="1792" y="160" font-size="12" fill="#4b5563">Data Table · Update</text>
+<rect x="2070" y="110" width="220" height="70" rx="10" fill="#f0fdf4" stroke="#15803d" stroke-width="1.5"/>
+<text x="2082" y="138" font-size="15" font-weight="bold" fill="#111827">Respond sent</text>
+<text x="2082" y="160" font-size="12" fill="#4b5563">Respond to Webhook</text>
+</svg>
