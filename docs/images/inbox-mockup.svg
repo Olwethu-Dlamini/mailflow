@@ -1,69 +1,132 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Helvetica, Arial, sans-serif">
-  <rect width="1200" height="640" fill="#ffffff"/>
-  <rect x="20" y="20" width="1160" height="600" rx="12" fill="#ffffff" stroke="#d1d5db"/>
-  <rect x="20" y="20" width="1160" height="56" rx="12" fill="#111827"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" font-family="Helvetica, Arial, sans-serif">
+  <rect width="1200" height="720" fill="#ffffff"/>
+  <rect x="20" y="20" width="1160" height="680" rx="12" fill="#f4f5f7" stroke="#d1d5db"/>
+  <path d="M32 20 H1168 A12 12 0 0 1 1180 32 V76 H20 V32 A12 12 0 0 1 32 20 Z" fill="#1f3a5f"/>
   <text x="44" y="56" font-size="22" font-weight="bold" fill="#ffffff">MailFlow</text>
-  <text x="170" y="55" font-size="15" fill="#9ca3af">all company mailboxes · 128 open</text>
-  <rect x="820" y="34" width="340" height="30" rx="6" fill="#1f2937" stroke="#374151"/>
-  <text x="836" y="54" font-size="14" fill="#9ca3af">Search sender or subject…</text>
-
-  <!-- filters -->
-  <rect x="20" y="76" width="240" height="544" fill="#f9fafb"/>
-  <g font-size="14" fill="#1f2937">
-    <text x="40" y="110" font-size="12" font-weight="bold" fill="#6b7280">MAILBOX</text>
-    <text x="40" y="134" font-weight="bold">All mailboxes  128</text>
-    <text x="40" y="158">info@  41</text><text x="40" y="182">sales@ (Gmail)  33</text>
-    <text x="40" y="206">accounts@ (M365)  29</text><text x="40" y="230">support@ (IMAP)  19</text><text x="40" y="254">old work (POP3)  6</text>
-    <text x="40" y="294" font-size="12" font-weight="bold" fill="#6b7280">CATEGORY</text>
-    <text x="40" y="318">Billing · Support · Sales</text><text x="40" y="342">Internal · Newsletter · Other</text>
-    <text x="40" y="382" font-size="12" font-weight="bold" fill="#6b7280">MOOD</text>
-    <circle cx="46" cy="402" r="6" fill="#ef4444"/><text x="60" y="407">Negative  7</text>
-    <circle cx="46" cy="428" r="6" fill="#9ca3af"/><text x="60" y="433">Neutral  96</text>
-    <circle cx="46" cy="454" r="6" fill="#22c55e"/><text x="60" y="459">Positive  25</text>
-    <text x="40" y="499" font-size="12" font-weight="bold" fill="#6b7280">STATUS</text>
-    <text x="40" y="523">New · Done</text>
+  <text x="160" y="55" font-size="15" fill="#dbe4ef">5 need a reply</text>
+  <rect x="276" y="38" width="64" height="24" rx="12" fill="#d1242f"/><text x="308" y="55" font-size="13" fill="#ffffff" text-anchor="middle">2 × P1</text>
+  <text x="360" y="55" font-size="15" fill="#dbe4ef">128 emails · last 30 days</text>
+  <rect x="20" y="76" width="220" height="624" fill="#ffffff" stroke="#e1e4e8"/>
+  <g font-size="13" fill="#1f3a5f">
+    <text x="36" y="102" font-size="11" font-weight="bold" fill="#6a737d" letter-spacing=".5">VIEWS</text>
+    <rect x="30" y="108" width="200" height="20" rx="5" fill="#1f3a5f"/>
+    <text x="38" y="122" fill="#ffffff">Needs reply</text>
+    <text x="222" y="122" fill="#ffffff" font-size="12" text-anchor="end" opacity=".75">5</text>
+    <text x="38" y="143" fill="#1f3a5f">P1 · answer today</text>
+    <text x="222" y="143" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">2</text>
+    <text x="38" y="164" fill="#1f3a5f">Waiting on customer</text>
+    <text x="222" y="164" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">3</text>
+    <text x="38" y="185" fill="#1f3a5f">Done</text>
+    <text x="222" y="185" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">112</text>
+    <text x="38" y="206" fill="#1f3a5f">Everything</text>
+    <text x="222" y="206" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">128</text>
+    <text x="36" y="235" font-size="11" font-weight="bold" fill="#6a737d" letter-spacing=".5">MAILBOX</text>
+    <rect x="30" y="241" width="200" height="20" rx="5" fill="#1f3a5f"/>
+    <text x="38" y="255" fill="#ffffff">All</text>
+    <text x="38" y="276" fill="#1f3a5f">accounts@</text>
+    <text x="222" y="276" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">29</text>
+    <text x="38" y="297" fill="#1f3a5f">info@</text>
+    <text x="222" y="297" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">41</text>
+    <text x="38" y="318" fill="#1f3a5f">sales@</text>
+    <text x="222" y="318" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">33</text>
+    <text x="38" y="339" fill="#1f3a5f">support@</text>
+    <text x="222" y="339" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">25</text>
+    <text x="36" y="368" font-size="11" font-weight="bold" fill="#6a737d" letter-spacing=".5">TYPE</text>
+    <rect x="30" y="374" width="200" height="20" rx="5" fill="#1f3a5f"/>
+    <text x="38" y="388" fill="#ffffff">All</text>
+    <text x="38" y="409" fill="#1f3a5f">Cancellation</text>
+    <text x="222" y="409" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">2</text>
+    <text x="38" y="430" fill="#1f3a5f">Complaint</text>
+    <text x="222" y="430" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">4</text>
+    <text x="38" y="451" fill="#1f3a5f">Marketing</text>
+    <text x="222" y="451" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">61</text>
+    <text x="38" y="472" fill="#1f3a5f">Notification</text>
+    <text x="222" y="472" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">35</text>
+    <text x="38" y="493" fill="#1f3a5f">Order</text>
+    <text x="222" y="493" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">6</text>
+    <text x="38" y="514" fill="#1f3a5f">Question</text>
+    <text x="222" y="514" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">9</text>
+    <text x="36" y="543" font-size="11" font-weight="bold" fill="#6a737d" letter-spacing=".5">MOOD</text>
+    <rect x="30" y="549" width="200" height="20" rx="5" fill="#1f3a5f"/>
+    <text x="38" y="563" fill="#ffffff">All</text>
+    <text x="38" y="584" fill="#1f3a5f">Angry</text>
+    <text x="222" y="584" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">2</text>
+    <text x="38" y="605" fill="#1f3a5f">Frustrated</text>
+    <text x="222" y="605" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">3</text>
+    <text x="38" y="626" fill="#1f3a5f">Neutral</text>
+    <text x="222" y="626" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">98</text>
+    <text x="38" y="647" fill="#1f3a5f">Happy</text>
+    <text x="222" y="647" fill="#1f3a5f" font-size="12" text-anchor="end" opacity=".75">25</text>
   </g>
-
-  <!-- list -->
-  <g font-size="14">
-    <rect x="260" y="76" width="460" height="86" fill="#fef2f2"/>
-    <circle cx="282" cy="104" r="6" fill="#ef4444"/>
-    <text x="298" y="108" font-weight="bold" fill="#111827">Sipho M. — Charged twice for November</text>
-    <text x="298" y="130" font-size="13" fill="#6b7280">accounts@ · 08:41</text>
-    <rect x="298" y="138" width="56" height="18" rx="9" fill="#fee2e2"/><text x="306" y="151" font-size="11" fill="#b91c1c">Billing</text>
-    <rect x="360" y="138" width="44" height="18" rx="9" fill="#fecaca"/><text x="368" y="151" font-size="11" fill="#b91c1c">High</text>
-    <line x1="260" y1="162" x2="720" y2="162" stroke="#e5e7eb"/>
-    <circle cx="282" cy="190" r="6" fill="#22c55e"/>
-    <text x="298" y="194" font-weight="bold" fill="#111827">Lerato K. — Quote for 20 office routers</text>
-    <text x="298" y="216" font-size="13" fill="#6b7280">sales@ · 08:12</text>
-    <rect x="298" y="224" width="48" height="18" rx="9" fill="#dbeafe"/><text x="306" y="237" font-size="11" fill="#1d4ed8">Sales</text>
-    <line x1="260" y1="248" x2="720" y2="248" stroke="#e5e7eb"/>
-    <circle cx="282" cy="276" r="6" fill="#22c55e"/>
-    <text x="298" y="280" fill="#111827">Nomsa D. — Re: connection problem</text>
-    <text x="298" y="302" font-size="13" fill="#6b7280">support@ · 07:58</text>
-    <rect x="298" y="310" width="60" height="18" rx="9" fill="#dcfce7"/><text x="306" y="323" font-size="11" fill="#15803d">Support</text>
-    <line x1="260" y1="334" x2="720" y2="334" stroke="#e5e7eb"/>
-    <circle cx="282" cy="362" r="6" fill="#9ca3af"/>
-    <text x="298" y="366" fill="#6b7280">Supplier News — November newsletter</text>
-    <text x="298" y="388" font-size="13" fill="#9ca3af">info@ · 06:30 · sorted by a rule, no AI</text>
-    <line x1="260" y1="400" x2="720" y2="400" stroke="#e5e7eb"/>
+  <g font-size="14" fill="#1f2328">
+    <rect x="252" y="90" width="500" height="96" rx="8" fill="#ffffff" stroke="#1f3a5f"/>
+    <rect x="262" y="100" width="30" height="20" rx="5" fill="#d1242f"/><text x="277" y="114" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">P1</text>
+    <text x="302" y="114" font-weight="bold">Sipho Mamba</text>
+    <rect x="408" y="101" width="69" height="18" rx="17" fill="#eef1f5"/><text x="415" y="114" font-size="11" fill="#1f2328">Complaint</text>
+    <rect x="483" y="101" width="45" height="18" rx="17" fill="#ffebe9"/><text x="490" y="114" font-size="11" fill="#a40e26">Angry</text>
+    <rect x="534" y="101" width="69" height="18" rx="17" fill="#ffffff" stroke="#d0d7de"/><text x="541" y="114" font-size="11" fill="#1f2328">accounts@</text>
+    <text x="302" y="135" font-weight="500">Charged twice for November</text>
+    <text x="302" y="154" font-size="13" fill="#57606a">Card debited twice for INV-2291; wants one payment refunded.</text>
+    <text x="302" y="173" font-size="13" fill="#0550ae">→ Refund one payment today</text>
+    <text x="742" y="114" font-size="12" fill="#6a737d" text-anchor="end">Mon 16 Nov, 08:41</text>
+    <rect x="670" y="123" width="72" height="18" rx="9" fill="#d1242f"/><text x="706" y="136" font-size="11" fill="#ffffff" text-anchor="middle">waiting 5 h</text>
+    <rect x="252" y="194" width="500" height="96" rx="8" fill="#ffffff" stroke="#e1e4e8"/>
+    <rect x="262" y="204" width="30" height="20" rx="5" fill="#d1242f"/><text x="277" y="218" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">P1</text>
+    <text x="302" y="218" font-weight="bold">Thabo Dlamini</text>
+    <rect x="425" y="205" width="69" height="18" rx="17" fill="#eef1f5"/><text x="432" y="218" font-size="11" fill="#1f2328">Complaint</text>
+    <rect x="500" y="205" width="45" height="18" rx="17" fill="#ffebe9"/><text x="507" y="218" font-size="11" fill="#a40e26">Angry</text>
+    <rect x="551" y="205" width="63" height="18" rx="17" fill="#ffffff" stroke="#d0d7de"/><text x="558" y="218" font-size="11" fill="#1f2328">support@</text>
+    <text x="302" y="239" font-weight="500">Internet down since yesterday</text>
+    <text x="302" y="258" font-size="13" fill="#57606a">Office internet has been down since yesterday morning.</text>
+    <text x="302" y="277" font-size="13" fill="#0550ae">→ Investigate and fix internet issue</text>
+    <text x="742" y="218" font-size="12" fill="#6a737d" text-anchor="end">Mon 16 Nov, 10:35</text>
+    <text x="742" y="240" font-size="11" fill="#57606a" text-anchor="end">waiting 3 h</text>
+    <rect x="252" y="298" width="500" height="96" rx="8" fill="#ffffff" stroke="#e1e4e8"/>
+    <rect x="262" y="308" width="30" height="20" rx="5" fill="#f0b429"/><text x="277" y="322" font-size="12" font-weight="bold" fill="#3a2a00" text-anchor="middle">P2</text>
+    <text x="302" y="322" font-weight="bold">Lerato Khumalo</text>
+    <rect x="433" y="309" width="45" height="18" rx="17" fill="#eef1f5"/><text x="440" y="322" font-size="11" fill="#1f2328">Order</text>
+    <rect x="484" y="309" width="57" height="18" rx="17" fill="#eef1f5"/><text x="491" y="322" font-size="11" fill="#1f2328">Neutral</text>
+    <rect x="547" y="309" width="51" height="18" rx="17" fill="#ffffff" stroke="#d0d7de"/><text x="554" y="322" font-size="11" fill="#1f2328">sales@</text>
+    <text x="302" y="343" font-weight="500">Quote for 20 office routers</text>
+    <text x="302" y="362" font-size="13" fill="#57606a">Wants a price and lead time for 20 office routers.</text>
+    <text x="302" y="381" font-size="13" fill="#0550ae">→ Send pricing and lead time</text>
+    <text x="742" y="322" font-size="12" fill="#6a737d" text-anchor="end">Mon 16 Nov, 10:52</text>
+    <text x="742" y="344" font-size="11" fill="#57606a" text-anchor="end">waiting 3 h</text>
+    <rect x="252" y="402" width="500" height="96" rx="8" fill="#ffffff" stroke="#e1e4e8"/>
+    <rect x="262" y="412" width="30" height="20" rx="5" fill="#f0b429"/><text x="277" y="426" font-size="12" font-weight="bold" fill="#3a2a00" text-anchor="middle">P2</text>
+    <text x="302" y="426" font-weight="bold">Nomsa Dube</text>
+    <rect x="400" y="413" width="88" height="18" rx="17" fill="#eef1f5"/><text x="407" y="426" font-size="11" fill="#1f2328">Cancellation</text>
+    <rect x="494" y="413" width="57" height="18" rx="17" fill="#eef1f5"/><text x="501" y="426" font-size="11" fill="#1f2328">Neutral</text>
+    <rect x="557" y="413" width="45" height="18" rx="17" fill="#ffffff" stroke="#d0d7de"/><text x="564" y="426" font-size="11" fill="#1f2328">info@</text>
+    <text x="302" y="447" font-weight="500">Cancel my subscription</text>
+    <text x="302" y="466" font-size="13" fill="#57606a">Wants to stop the subscription at the end of the month.</text>
+    <text x="302" y="485" font-size="13" fill="#0550ae">→ Cancel subscription at end of month</text>
+    <text x="742" y="426" font-size="12" fill="#6a737d" text-anchor="end">Mon 16 Nov, 12:40</text>
+    <text x="742" y="448" font-size="11" fill="#57606a" text-anchor="end">waiting 1 h</text>
+    <text x="502" y="528" font-size="12" fill="#6a737d" text-anchor="middle">P1 first, then oldest first · late after 4 h (P1) / 24 h (P2)</text>
   </g>
-  <line x1="720" y1="76" x2="720" y2="620" stroke="#e5e7eb"/>
-
-  <!-- detail -->
-  <g font-size="14" fill="#111827">
-    <text x="744" y="112" font-size="20" font-weight="bold">Charged twice for November</text>
-    <text x="744" y="138" fill="#6b7280">Sipho Mamba &lt;sipho@example.com&gt; → accounts@</text>
-    <rect x="744" y="154" width="412" height="60" rx="8" fill="#f5f3ff" stroke="#c4b5fd"/>
-    <text x="760" y="178" font-size="13" fill="#5b21b6">AI: Billing · Negative · High urgency</text>
-    <text x="760" y="200" font-size="13" fill="#5b21b6">"Card debited twice for INV-2291; refund one today."</text>
-    <text x="744" y="248">Hi, my card was debited twice for the</text>
-    <text x="744" y="270">November invoice (INV-2291). This is the</text>
-    <text x="744" y="292">second time this happens. Please refund</text>
-    <text x="744" y="314">one payment today, I need that money.</text>
-    <rect x="744" y="560" width="150" height="38" rx="8" fill="#16a34a"/>
-    <text x="772" y="584" font-size="15" fill="#ffffff">Mark as done</text>
-    <rect x="910" y="560" width="246" height="38" rx="8" fill="#ffffff" stroke="#9ca3af"/>
-    <text x="928" y="584" font-size="15" fill="#374151">Reply in accounts@ mailbox</text>
+  <rect x="762" y="84" width="412" height="600" rx="8" fill="#ffffff" stroke="#e1e4e8"/>
+  <g font-size="13" fill="#1f2328">
+    <text x="776" y="112" font-size="11" fill="#1f3a5f">← Back to inbox</text>
+    <text x="776" y="140" font-size="19" font-weight="bold">Charged twice for November</text>
+    <text x="776" y="162" fill="#57606a">From <tspan font-weight="bold" fill="#1f2328">Sipho Mamba</tspan> &lt;sipho@example.com&gt;</text>
+    <text x="776" y="180" fill="#57606a">To mailbox <tspan font-weight="bold" fill="#1f2328">accounts@</tspan> · Mon 16 Nov, 08:41 · status <tspan font-weight="bold" fill="#1f2328">Open</tspan></text>
+    <rect x="776" y="194" width="384" height="96" rx="8" fill="#f4f5f7"/><rect x="776" y="194" width="4" height="96" fill="#1f3a5f"/>
+    <rect x="790" y="204" width="30" height="20" rx="5" fill="#d1242f"/><text x="805" y="218" font-size="12" font-weight="bold" fill="#ffffff" text-anchor="middle">P1</text>
+    <rect x="828" y="205" width="69" height="18" rx="9" fill="#eef1f5"/><text x="835" y="218" font-size="11" fill="#1f2328">Complaint</text>
+    <rect x="903" y="205" width="45" height="18" rx="9" fill="#ffebe9"/><text x="910" y="218" font-size="11" fill="#a40e26">Angry</text>
+    <rect x="954" y="205" width="94" height="18" rx="9" fill="#eef1f5"/><text x="961" y="218" font-size="11" fill="#1f2328">needs a reply</text>
+    <text x="1054" y="218" font-size="11" fill="#6a737d">sorted by AI</text>
+    <text x="790" y="246">Card debited twice for INV-2291;</text><text x="790" y="262">wants one payment refunded.</text>
+    <text x="790" y="282" font-weight="bold" fill="#0550ae">Next step: Refund one payment today</text>
+    <rect x="776" y="304" width="384" height="128" rx="8" fill="#ffffff" stroke="#e1e4e8"/>
+    <text x="788" y="326">Hello,</text>
+    <text x="788" y="348">My card was debited twice for the November</text>
+    <text x="788" y="370">invoice INV-2291. This is the second time this</text>
+    <text x="788" y="392">happens. I want one payment refunded today,</text>
+    <text x="788" y="414">or I will cancel my contract.  Sipho</text>
+    <text x="776" y="452" font-size="12" fill="#6a737d">Reply from the <tspan font-weight="bold">accounts@</tspan> mailbox in your mail app,</text><text x="776" y="467" font-size="12" fill="#6a737d">then mark it here.</text>
+    <rect x="776" y="480" width="228" height="34" rx="6" fill="#0969da"/><text x="890" y="502" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">Replied · waiting on customer</text>
+    <rect x="1014" y="480" width="70" height="34" rx="6" fill="#1a7f37"/><text x="1049" y="502" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="middle">Done</text>
   </g>
 </svg>

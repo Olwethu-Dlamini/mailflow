@@ -1,7 +1,7 @@
 # MailFlow
 
-All company mailboxes in one place, each email sorted by **category** and **mood**, on one web
-page. Built step by step in **n8n**, with the AI running on the company's own server.
+All company mailboxes in one place, each email sorted for customer service (**type**, **priority**,
+**mood**, whether it **needs a reply** and the **next step**), on one web page. Built step by step in **n8n**, with the AI running on the company's own server.
 
 ![How MailFlow fits together](docs/images/architecture.png)
 

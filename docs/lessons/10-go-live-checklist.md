@@ -37,12 +37,12 @@ For each type you use (POP3 work mail, IMAP, Gmail, Microsoft 365), send one ema
 account to one mailbox of that type, then:
 
 1. Within about 2 minutes it is on the inbox page with the right mailbox label.
-2. Its category, mood and urgency look right; open it, the body is readable.
-3. Click **Mark as done**; it shows as done.
+2. Its type, priority, mood, summary and next step look right; open it, the body is readable.
+3. Click **Replied · waiting on customer**, then **Done**; it moves to **Waiting on customer**, then to **Done**.
 4. In the mail app, the email is still there and unread.
 
-Also send one angry, urgent test email (like the billing example in lesson 2) to any mailbox:
-the Telegram alert arrives. Afterwards delete the test rows.
+Also send one angry test email that needs an answer today (like the billing example in lesson 2)
+to any mailbox: it is sorted P1 and the "🔴 P1 email: answer today" Telegram alert arrives. Afterwards delete the test rows.
 
 ## Check it works
 
@@ -52,11 +52,11 @@ All 12 lines ticked; every end-to-end test passed.
 
 | What | How | Act when |
 |---|---|---|
-| Is mail arriving? | Inbox page header: **Newest email** time | Older than you expect for a working day: check **Executions** for failures |
+| Is mail arriving? | Inbox page, **Everything** view: the newest email is at the top | Older than you expect for a working day: check **Executions** for failures |
 | Failures | Telegram error messages; n8n → **Executions** (only failed runs are kept on this server) | Any repeated error: fix the node it names |
 | AI speed | How long emails take to appear in busy mornings | Often more than ~10 minutes behind: raise `OLLAMA_KEEP_ALIVE`, add rules, or consider a cloud model (D3/D4) |
-| Sorting quality | Skim categories and moods daily | The same kind of email keeps landing wrong: sharpen the category `description` in the schema (lesson 2) |
-| Rules catching too much | Filter **Newsletter**: anything important there? | Narrow the `Obvious mail?` conditions |
+| Sorting quality | Skim types, priorities and moods daily | The same kind of email keeps landing wrong (e.g. a real complaint as P3): sharpen the `type` or `priority` `description` in the schema (lesson 2) |
+| Rules catching too much | **Everything** view, filter Type **Marketing** / **Notification**: anything important there? | Narrow the `Obvious mail?` conditions |
 | Duplicates | Same email twice in the list | Check `message_id` is filled in that collector |
 | Table size | Data tables view | Growing fast: ask your helper to raise `N8N_DATA_TABLES_MAX_SIZE_BYTES` to 1 GiB |
 | Secrets expiring | Calendar reminder for the Microsoft client secret; Gmail External logins expire every 7 days | Renew before they lapse |

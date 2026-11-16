@@ -3,7 +3,8 @@
 ## Goal
 
 Build `MailFlow · Inbox page`: one web page, behind a password, that lists the last 30 days of
-mail from every mailbox, newest first, with filters by mailbox, category, mood and status.
+mail from every mailbox as a customer-service queue: what needs a reply, most urgent (P1) first,
+with views by status and filters by mailbox, type and mood.
 Design: [SYSTEM-DESIGN.md §2.4 and §7](../SYSTEM-DESIGN.md#24-the-pages), picture:
 [inbox-mockup.png](../images/inbox-mockup.png).
 
@@ -34,7 +35,7 @@ Webhook → Get emails → Build page → Respond
    - **Order By**: `received_at`, descending.
    - Node **Settings** tab → **Always Output Data**: **on**. Without this, an empty table makes the
      node output nothing, the next nodes never run and the browser gets no page. With it on, the
-     node passes one empty item, and the code below shows "No emails".
+     node passes one empty item, which the code skips, and the page shows "Nothing here. 🎉".
 4. Add a **Code** node, rename it `Build page`, language JavaScript, **Mode**: Run Once for All
    Items. Paste the full code below.
 5. Add **Respond to Webhook**, rename it `Respond`.
@@ -45,27 +46,60 @@ Webhook → Get emails → Build page → Respond
 
 ### The `Build page` code
 
-It reads the filters from the address (`?mailbox=&category=&sentiment=&status=`), filters the
+It reads the view and filters from the address (`?view=&mailbox=&type=&mood=`), filters the
 rows, and builds one complete HTML page with its own styles. No outside scripts or fonts. All
 email text is escaped, so a subject like `<b>hi</b>` shows as text and cannot break the page.
 
 The email links go to `mailflow/email?id=...`. Because the page's address is `/webhook/mailflow`,
 a browser turns that link into `/webhook/mailflow/email?id=...`, the page from lesson 6.
 
+**Views** (left column, each with its count; the address carries `?view=`):
+
+| View | Shows | Order |
+|---|---|---|
+| **Needs reply** (default, no `view=` in the address) | `needs_reply` is true and `status` is `open` | P1 → P2 → P3, then oldest first |
+| **P1 · answer today** | `priority` P1 and not `done` | P1 → P3, then oldest first |
+| **Waiting on customer** | `status` is `waiting` (someone replied, the customer must answer) | P1 → P3, then oldest first |
+| **Done** | `status` is `done` (rows look faded) | newest first |
+| **Everything** | every row of the last 30 days | newest first |
+
+Older rows with `status` `new` (before the switch to the customer-service model) count as `open`.
+
+**Filters** under the views: **Mailbox** (the mailboxes that have mail), **Type** (only the types
+that occur) and **Mood**, each value with its count. They combine with the view; **All** clears one.
+
+**Each row** shows the P1/P2/P3 badge (P1 red, P2 amber, P3 grey), the sender, chips for type,
+mood (Angry red, Frustrated orange, Happy green) and mailbox, a "waiting on customer" chip when
+status is `waiting`, the subject, the AI summary and, while a reply is still needed, `→ next step`.
+On the right: the received time and, for open emails that need a reply, **waiting X h**. That
+label turns **red** when the email is late: more than **4 hours** for P1, more than **24 hours**
+for P2 (`LATE_AFTER` in the code). P3 is never late.
+
+The header shows how many need a reply, a red "N × P1" badge when there are P1 emails, and the
+number of emails in the last 30 days.
+
 ```javascript
-// MailFlow · Inbox page → Build page
+// MailFlow · Inbox page → Build page (customer-service view)
 const query = $('Webhook').first().json.query || {};
 const want = {
+  view: String(query.view || 'reply'),
   mailbox: String(query.mailbox || ''),
-  category: String(query.category || ''),
-  sentiment: String(query.sentiment || ''),
-  status: String(query.status || ''),
+  type: String(query.type || ''),
+  mood: String(query.mood || ''),
 };
 
-// Keep this list the same as the category enum in Process email (lesson 2).
-const CATEGORIES = ['Billing', 'Support', 'Sales', 'Internal', 'Newsletter', 'Other'];
-const MOODS = ['Negative', 'Neutral', 'Positive'];
-const STATUSES = ['new', 'done'];
+// Keep these lists the same as the enums in Process email.
+const TYPES = ['Complaint', 'Question', 'Request', 'Order', 'Payment', 'Technical', 'Cancellation', 'Feedback', 'Marketing', 'Notification', 'Other'];
+const MOODS = ['Angry', 'Frustrated', 'Neutral', 'Happy'];
+const VIEWS = [
+  ['reply', 'Needs reply'],
+  ['p1', 'P1 · answer today'],
+  ['waiting', 'Waiting on customer'],
+  ['done', 'Done'],
+  ['all', 'Everything'],
+];
+// Hours before an open email counts as late.
+const LATE_AFTER = { P1: 4, P2: 24 };
 const TIME_ZONE = 'Africa/Mbabane';
 
 function esc(value) {
@@ -73,131 +107,163 @@ function esc(value) {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   }[c]));
 }
-
 function timeOf(value) {
   const t = new Date(value).getTime();
   return Number.isNaN(t) ? 0 : t;
 }
-
 function showTime(value) {
   const t = timeOf(value);
   if (!t) return '';
   try {
-    return new Date(t).toLocaleString('en-GB', {
-      timeZone: TIME_ZONE, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
-    });
+    return new Date(t).toLocaleString('en-GB', { timeZone: TIME_ZONE, day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   } catch (e) {
     return new Date(t).toISOString().slice(0, 16).replace('T', ' ');
   }
 }
-
-// A link to this page with one filter changed ('' removes that filter).
-function filterLink(name, value) {
-  const next = { ...want, [name]: value };
+function age(value) {
+  const hours = (Date.now() - timeOf(value)) / 3600000;
+  if (!timeOf(value) || hours < 0) return { text: '', hours: 0 };
+  if (hours < 1) return { text: `${Math.max(1, Math.round(hours * 60))} min`, hours };
+  if (hours < 48) return { text: `${Math.round(hours)} h`, hours };
+  return { text: `${Math.round(hours / 24)} days`, hours };
+}
+function link(changes) {
+  const next = { ...want, ...changes };
   const parts = Object.keys(next)
-    .filter((k) => next[k])
+    .filter((k) => next[k] && !(k === 'view' && next[k] === 'reply'))
     .map((k) => encodeURIComponent(k) + '=' + encodeURIComponent(next[k]));
   return parts.length ? '?' + parts.join('&') : '?';
 }
+const statusOf = (r) => (r.status === 'new' || !r.status ? 'open' : r.status);
+const replyNeeded = (r) => r.needs_reply === true || r.needs_reply === 'true';
 
-// Rows from the table. "Always Output Data" sends one empty item when there are none: skip it.
-const all = $input.all()
-  .map((item) => item.json)
-  .filter((row) => row && row.message_id);
+// Rows. "Always Output Data" sends one empty item when there are none: skip it.
+const all = $input.all().map((i) => i.json).filter((r) => r && r.message_id);
+
+const inView = {
+  reply: (r) => replyNeeded(r) && statusOf(r) === 'open',
+  p1: (r) => r.priority === 'P1' && statusOf(r) !== 'done',
+  waiting: (r) => statusOf(r) === 'waiting',
+  done: (r) => statusOf(r) === 'done',
+  all: () => true,
+};
+const viewTest = inView[want.view] || inView.reply;
+const prioRank = { P1: 0, P2: 1, P3: 2 };
 
 const rows = all
+  .filter(viewTest)
   .filter((r) => !want.mailbox || r.mailbox === want.mailbox)
-  .filter((r) => !want.category || r.category === want.category)
-  .filter((r) => !want.sentiment || r.sentiment === want.sentiment)
-  .filter((r) => !want.status || (r.status || 'new') === want.status)
-  .sort((a, b) => timeOf(b.received_at) - timeOf(a.received_at));
+  .filter((r) => !want.type || r.type === want.type)
+  .filter((r) => !want.mood || r.mood === want.mood)
+  .sort((a, b) => want.view === 'done' || want.view === 'all'
+    ? timeOf(b.received_at) - timeOf(a.received_at)
+    : (prioRank[a.priority] ?? 3) - (prioRank[b.priority] ?? 3) || timeOf(a.received_at) - timeOf(b.received_at));
 
+const count = (test) => all.filter(test).length;
 const mailboxes = [...new Set(all.map((r) => r.mailbox).filter(Boolean))].sort();
-const newest = all.reduce((max, r) => Math.max(max, timeOf(r.received_at)), 0);
 
-function filterGroup(title, name, values) {
-  const links = [['', 'All'], ...values.map((v) => [v, v])].map(([value, label]) => {
+function group(title, name, values, counts) {
+  const items = [['', 'All'], ...values.map((v) => [v, v])].map(([value, label]) => {
     const active = want[name] === value ? ' class="active"' : '';
-    return `<li><a${active} href="${esc(filterLink(name, value))}">${esc(label)}</a></li>`;
+    const n = counts && value ? ` <span class="n">${counts(value)}</span>` : '';
+    return `<li><a${active} href="${esc(link({ [name]: value }))}">${esc(label)}${n}</a></li>`;
   });
-  return `<h3>${esc(title)}</h3><ul>${links.join('')}</ul>`;
+  return `<h3>${esc(title)}</h3><ul>${items.join('')}</ul>`;
 }
+const views = VIEWS.map(([key, label]) => {
+  const active = want.view === key ? ' class="active"' : '';
+  return `<li><a${active} href="${esc(link({ view: key }))}">${esc(label)} <span class="n">${count(inView[key])}</span></a></li>`;
+}).join('');
 
-const moodColour = { Negative: '#d9534f', Neutral: '#9aa0a6', Positive: '#2e9d5b' };
-
+const moodClass = { Angry: 'angry', Frustrated: 'frustrated', Neutral: 'neutral', Happy: 'happy' };
 const list = rows.map((r) => {
-  const dot = moodColour[r.sentiment] || '#9aa0a6';
-  const urgent = r.urgency === 'High' ? ' urgent' : '';
-  const done = (r.status || 'new') === 'done' ? ' done' : '';
+  const st = statusOf(r);
+  const a = age(r.received_at);
+  const late = st === 'open' && replyNeeded(r) && LATE_AFTER[r.priority] && a.hours > LATE_AFTER[r.priority];
   const href = 'mailflow/email?id=' + encodeURIComponent(r.message_id);
-  return `<a class="row${done}" href="${esc(href)}">
-    <span class="dot" style="background:${dot}" title="${esc(r.sentiment)}"></span>
+  return `<a class="row ${esc(st)}" href="${esc(href)}">
+    <span class="prio ${esc(r.priority)}">${esc(r.priority)}</span>
     <span class="main">
       <span class="top">
         <span class="from">${esc(r.from_name || r.from_address)}</span>
-        <span class="chip">${esc(r.category)}</span>
-        <span class="chip${urgent}">${esc(r.urgency)}</span>
+        <span class="chip">${esc(r.type)}</span>
+        <span class="chip mood ${moodClass[r.mood] || ''}">${esc(r.mood)}</span>
         <span class="chip box">${esc(r.mailbox)}</span>
+        ${st === 'waiting' ? '<span class="chip wait">waiting on customer</span>' : ''}
       </span>
       <span class="subject">${esc(r.subject)}</span>
       <span class="summary">${esc(r.summary)}</span>
+      ${replyNeeded(r) && st !== 'done' ? `<span class="next">→ ${esc(r.next_step)}</span>` : ''}
     </span>
-    <span class="time">${esc(showTime(r.received_at))}</span>
+    <span class="side">
+      <span class="time">${esc(showTime(r.received_at))}</span>
+      ${st === 'open' && replyNeeded(r) && a.text ? `<span class="age${late ? ' late' : ''}">waiting ${esc(a.text)}</span>` : ''}
+    </span>
   </a>`;
 }).join('');
-
-const empty = '<p class="empty">No emails match these filters.</p>';
-const filtered = Object.values(want).some(Boolean);
 
 const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MailFlow inbox</title>
+<title>MailFlow</title>
 <style>
-  body { margin: 0; font-family: system-ui, sans-serif; color: #222; background: #f5f6f8; }
-  header { background: #1f3a5f; color: #fff; padding: 12px 20px; display: flex; gap: 20px; align-items: baseline; }
+  body { margin: 0; font-family: system-ui, sans-serif; color: #1f2328; background: #f4f5f7; }
+  header { background: #1f3a5f; color: #fff; padding: 12px 20px; display: flex; gap: 24px; align-items: baseline; }
   header h1 { margin: 0; font-size: 20px; }
   header .meta { font-size: 14px; opacity: .85; }
+  header .p1 { background: #d1242f; padding: 2px 8px; border-radius: 10px; font-size: 13px; }
   .wrap { display: flex; }
-  nav { width: 190px; padding: 12px 16px; background: #fff; border-right: 1px solid #e3e5e8; min-height: 100vh; }
-  nav h3 { font-size: 12px; text-transform: uppercase; color: #666; margin: 16px 0 4px; }
+  nav { width: 210px; padding: 8px 14px; background: #fff; border-right: 1px solid #e1e4e8; min-height: 100vh; }
+  nav h3 { font-size: 11px; text-transform: uppercase; color: #6a737d; margin: 16px 0 4px; letter-spacing: .04em; }
   nav ul { list-style: none; margin: 0; padding: 0; }
-  nav a { display: block; padding: 3px 6px; color: #1f3a5f; text-decoration: none; border-radius: 4px; font-size: 14px; }
+  nav a { display: flex; justify-content: space-between; padding: 4px 8px; color: #1f3a5f; text-decoration: none; border-radius: 5px; font-size: 14px; }
+  nav a:hover { background: #eef2f7; }
   nav a.active { background: #1f3a5f; color: #fff; }
-  main { flex: 1; padding: 12px 20px; }
+  nav .n { opacity: .7; font-size: 12px; }
+  main { flex: 1; padding: 12px 20px; max-width: 1100px; }
   .row { display: flex; gap: 12px; align-items: flex-start; background: #fff; padding: 10px 12px; margin-bottom: 6px;
-         border-radius: 6px; text-decoration: none; color: inherit; border: 1px solid #e3e5e8; }
+         border-radius: 8px; text-decoration: none; color: inherit; border: 1px solid #e1e4e8; }
   .row:hover { border-color: #1f3a5f; }
-  .row.done { opacity: .55; }
-  .dot { width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; flex: none; }
-  .main { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .row.done { opacity: .5; }
+  .prio { flex: none; width: 30px; text-align: center; font-weight: 700; font-size: 12px; padding: 3px 0; border-radius: 5px; background: #e1e4e8; color: #57606a; }
+  .prio.P1 { background: #d1242f; color: #fff; }
+  .prio.P2 { background: #f0b429; color: #3a2a00; }
+  .main { flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .top { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .from { font-weight: 600; }
-  .chip { font-size: 12px; background: #eef1f5; padding: 1px 7px; border-radius: 10px; }
-  .chip.urgent { background: #d9534f; color: #fff; }
-  .chip.box { background: #fff; border: 1px solid #ccd; }
+  .chip { font-size: 12px; background: #eef1f5; padding: 1px 8px; border-radius: 10px; }
+  .chip.box { background: #fff; border: 1px solid #d0d7de; }
+  .chip.wait { background: #ddf4ff; color: #0550ae; }
+  .mood.angry { background: #ffebe9; color: #a40e26; }
+  .mood.frustrated { background: #fff1e5; color: #953800; }
+  .mood.happy { background: #dafbe1; color: #116329; }
   .subject { font-weight: 500; }
-  .summary { color: #555; font-size: 14px; }
-  .time { color: #666; font-size: 13px; white-space: nowrap; }
-  .empty { color: #666; padding: 40px 0; text-align: center; }
+  .summary { color: #57606a; font-size: 14px; }
+  .next { color: #0550ae; font-size: 14px; }
+  .side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: none; }
+  .time { color: #6a737d; font-size: 13px; white-space: nowrap; }
+  .age { font-size: 12px; color: #57606a; white-space: nowrap; }
+  .age.late { color: #fff; background: #d1242f; padding: 1px 6px; border-radius: 8px; }
+  .empty { color: #6a737d; padding: 40px 0; text-align: center; }
 </style>
 </head>
 <body>
 <header>
   <h1>MailFlow</h1>
-  <span class="meta">${rows.length} email${rows.length === 1 ? '' : 's'}${filtered ? ' (filtered)' : ''} · last 30 days</span>
-  <span class="meta">Newest email: ${newest ? esc(showTime(newest)) : 'none yet'}</span>
+  <span class="meta">${count(inView.reply)} need a reply</span>
+  ${count(inView.p1) ? `<span class="p1">${count(inView.p1)} × P1</span>` : ''}
+  <span class="meta">${all.length} emails · last 30 days</span>
 </header>
 <div class="wrap">
   <nav>
-    ${filterGroup('Mailbox', 'mailbox', mailboxes)}
-    ${filterGroup('Category', 'category', CATEGORIES)}
-    ${filterGroup('Mood', 'sentiment', MOODS)}
-    ${filterGroup('Status', 'status', STATUSES)}
+    <h3>Views</h3><ul>${views}</ul>
+    ${group('Mailbox', 'mailbox', mailboxes, (v) => count((r) => r.mailbox === v))}
+    ${group('Type', 'type', TYPES.filter((t) => all.some((r) => r.type === t)), (v) => count((r) => r.type === v))}
+    ${group('Mood', 'mood', MOODS, (v) => count((r) => r.mood === v))}
   </nav>
-  <main>${rows.length ? list : empty}</main>
+  <main>${rows.length ? list : '<p class="empty">Nothing here. 🎉</p>'}</main>
 </div>
 </body>
 </html>`;
@@ -229,11 +295,12 @@ The Webhook node shows two addresses:
 
 1. Open `http://ai:5678/webhook/mailflow` (workflow active). The browser asks for a password; enter
    the `MailFlow page login` details.
-2. The page lists your emails, newest first; the header shows the count and the newest time.
-3. Click **Negative** under Mood: only negative emails remain and the address ends `?sentiment=Negative`.
-   Click **All** to clear it.
-4. Temporarily test the empty case: open `http://ai:5678/webhook/mailflow?category=NoSuchThing`.
-   The page says "No emails match these filters." (not an error).
+2. The page opens on **Needs reply**: P1 emails at the top, then P2, then P3, oldest first within
+   each. The header shows "N need a reply" and the P1 count.
+3. Click **Angry** under Mood: only angry emails remain and the address ends `?mood=Angry`.
+   Click **All** to clear it. Click **Everything**: every email, newest first, `?view=all`.
+4. Temporarily test the empty case: open `http://ai:5678/webhook/mailflow?type=NoSuchThing`.
+   The page says "Nothing here. 🎉" (not an error).
 5. Wrong password → the browser asks again; the page does not show.
 
 ## If something goes wrong
@@ -251,4 +318,5 @@ The Webhook node shows two addresses:
 
 - A Webhook plus Respond to Webhook turns a workflow into a web page.
 - The Code node builds the HTML; escaping keeps email text from breaking it.
+- Views, priority order and the waiting-time label turn a list of mail into a queue: answer the red ones first.
 - Test URL is for building; Production URL needs the workflow active; Basic Auth plus the Caddy rule protect it.

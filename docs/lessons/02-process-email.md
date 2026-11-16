@@ -4,7 +4,7 @@
 
 Build `MailFlow · Process email`: one sub-workflow that every mailbox collector calls. It skips
 emails already saved, tags obvious mail with simple rules, asks the AI about the rest, saves the
-row, and sends a Telegram alert for urgent, negative emails.
+row, and sends a Telegram alert for every P1 email (answer today).
 Design: [SYSTEM-DESIGN.md §2.2 and §2.3](../SYSTEM-DESIGN.md#23-process-email-the-shared-brain),
 picture: [workflows.png](../images/workflows.png).
 
@@ -12,7 +12,7 @@ When you are done the canvas looks like this:
 
 ```
 When Executed by Another Workflow → Has message id? → Already saved? → Obvious mail? ─true──→ Rule tags ─────────────────────────┐
-                                                                                   └false─→ Sort with AI ─→ Email + AI answer → AI tags ┴→ Save email → Urgent and angry? ─true→ Telegram alert
+                                                                                   └false─→ Sort with AI ─→ Email + AI answer → AI tags ┴→ Save email → P1? ─true→ Telegram alert
                                                                                         └──────────────────↗        ↑
                                                                                                          Ollama Chat Model (under Sort with AI)
 ```
@@ -20,7 +20,7 @@ When Executed by Another Workflow → Has message id? → Already saved? → Obv
 ## What you need
 
 - Lesson 1 done (`MailFlow emails` exists).
-- Decisions D1 (categories), D2 (what "High" means), D3 (AI choice) and D8 (who gets alerts) from
+- Decisions D1 (types), D2 (what P1, P2 and P3 mean), D3 (AI choice) and D8 (who gets alerts) from
   [WHAT-I-NEED.md](../WHAT-I-NEED.md). This lesson uses the defaults.
 - Credentials that already exist in n8n: `Ollama (local)` and `RI Email` (Telegram).
 - Your Telegram chat ID: open the live workflow `Work email · Telegram`, open the Code node
@@ -75,8 +75,8 @@ When Executed by Another Workflow → Has message id? → Already saved? → Obv
    `.toLowerCase()` makes "Unsubscribe" and "UNSUBSCRIBE" match too.
 
 7. On the **true** output add **Edit Fields (Set)**. Rename it `Rule tags`. **Mode**: Manual
-   Mapping. **Include Other Input Fields**: off. Add these 14 fields (all String). The names must be
-   exactly the table's column names:
+   Mapping. **Include Other Input Fields**: off. Add these 16 fields (all String except
+   `needs_reply`, which is **Boolean**). The names must be exactly the table's column names:
 
    | Name | Value |
    |---|---|
@@ -88,12 +88,17 @@ When Executed by Another Workflow → Has message id? → Already saved? → Obv
    | `subject` | `{{ $json.subject }}` |
    | `received_at` | `{{ $json.received_at }}` |
    | `body` | `{{ ($json.body \|\| '').slice(0, 4000) }}` |
-   | `category` | `Newsletter` |
-   | `sentiment` | `Neutral` |
-   | `urgency` | `Low` |
+   | `type` | `{{ /no-?reply/i.test($json.from_address \|\| '') ? 'Notification' : 'Marketing' }}` |
+   | `priority` | `P3` |
+   | `mood` | `Neutral` |
+   | `needs_reply` | `false` |
    | `summary` | `{{ $json.subject }}` |
+   | `next_step` | `No reply needed` |
    | `sorted_by` | `rule` |
-   | `status` | `new` |
+   | `status` | `open` |
+
+   Mail from a `noreply` / `no-reply` sender is an automatic **Notification**; the rest caught
+   here (newsletters, anything with "unsubscribe") is **Marketing**. Neither needs a reply.
 
 ### D. Everything else: ask the AI
 
@@ -109,20 +114,26 @@ When Executed by Another Workflow → Has message id? → Already saved? → Obv
      ```
 
    - **Schema Type**: **Define using JSON Schema**. Paste this schema (design §2.3). If you chose
-     other categories in D1, change the `category` list here:
+     other types in D1, change the `type` list here (and `TYPES` in lesson 5):
 
      ```json
      {
        "type": "object",
        "properties": {
-         "category":  { "type": "string", "enum": ["Billing","Support","Sales","Internal","Newsletter","Other"], "description": "What the email is about" },
-         "sentiment": { "type": "string", "enum": ["Positive","Neutral","Negative"], "description": "The sender's mood" },
-         "urgency":   { "type": "string", "enum": ["High","Normal","Low"], "description": "High if it needs an answer today" },
-         "summary":   { "type": "string", "description": "One short sentence, at most 15 words" }
+         "type": {"type": "string", "enum": ["Complaint", "Question", "Request", "Order", "Payment", "Technical", "Cancellation", "Feedback", "Marketing", "Notification", "Other"], "description": "What the sender wants. Complaint: unhappy about something that went wrong. Question: asks for information. Request: asks us to do or change something. Order: wants to buy or asks for a quote. Payment: invoices, charges, refunds. Technical: something does not work. Cancellation: wants to stop a service. Feedback: praise or suggestions. Marketing: newsletters and promotions. Notification: automatic messages from systems. Other: anything else."},
+         "priority": {"type": "string", "enum": ["P1", "P2", "P3"], "description": "P1: answer today (angry customer, service down, money taken wrongly, threat to cancel or leave, legal). P2: answer this week (normal customer questions, requests, orders). P3: no rush or no answer needed (thanks, newsletters, notifications)."},
+         "mood": {"type": "string", "enum": ["Angry", "Frustrated", "Neutral", "Happy"], "description": "The sender's mood"},
+         "needs_reply": {"type": "boolean", "description": "true if a person must answer this email, false for automatic messages, newsletters and simple thank-yous"},
+         "summary": {"type": "string", "description": "What the email says, one short sentence, at most 15 words"},
+         "next_step": {"type": "string", "description": "What our staff should do next, at most 12 words, starting with a verb"}
        },
-       "required": ["category","sentiment","urgency","summary"]
+       "required": ["type", "priority", "mood", "needs_reply", "summary", "next_step"]
      }
      ```
+
+     The descriptions are the instructions the model reads: P1 means answer today (angry
+     customer, service down, money taken wrongly, threat to cancel, legal), P2 this week, P3 no
+     rush. `next_step` tells staff what to do, starting with a verb.
 
 9. Under `Sort with AI`, click the **Model** connector (+) and add **Ollama Chat Model**.
    - **Credential**: `Ollama (local)`.
@@ -141,7 +152,8 @@ When Executed by Another Workflow → Has message id? → Already saved? → Obv
     once.
 
 11. After the Merge add **Edit Fields (Set)**. Rename it `AI tags`. Manual Mapping, **Include
-    Other Input Fields** off. Now everything is in `$json`:
+    Other Input Fields** off. Now everything is in `$json`. All fields are String except
+    `needs_reply`, which is **Boolean**:
 
     | Name | Value |
     |---|---|
@@ -153,43 +165,44 @@ When Executed by Another Workflow → Has message id? → Already saved? → Obv
     | `subject` | `{{ $json.subject }}` |
     | `received_at` | `{{ $json.received_at }}` |
     | `body` | `{{ ($json.body \|\| '').slice(0, 4000) }}` |
-    | `category` | `{{ $json.output.category }}` |
-    | `sentiment` | `{{ $json.output.sentiment }}` |
-    | `urgency` | `{{ $json.output.urgency }}` |
+    | `type` | `{{ $json.output.type }}` |
+    | `priority` | `{{ $json.output.priority }}` |
+    | `mood` | `{{ $json.output.mood }}` |
+    | `needs_reply` | `{{ $json.output.needs_reply }}` |
     | `summary` | `{{ $json.output.summary }}` |
+    | `next_step` | `{{ $json.output.next_step }}` |
     | `sorted_by` | `ai` |
-    | `status` | `new` |
+    | `status` | `open` |
 
-    Tip: drag `output → category` etc. from the input panel rather than typing. (Steps below keep
-    their numbers; read "12" for the next one if you count.)
+    Tip: drag `output → type` etc. from the input panel rather than typing.
 
 ### E. Save and alert
 
-11. Add a **Data Table** node. Rename it `Save email`. **Operation**: **Insert**. **Data table**:
+12. Add a **Data Table** node. Rename it `Save email`. **Operation**: **Insert**. **Data table**:
     `MailFlow emails`. **Mapping Column Mode**: **Map Automatically**. This copies every field
-    whose name equals a column name, which is why steps 7 and 10 used the exact column names.
-12. Connect **both** `Rule tags` and `AI tags` into `Save email` (drag from each node's output
+    whose name equals a column name, which is why steps 7 and 11 used the exact column names.
+13. Connect **both** `Rule tags` and `AI tags` into `Save email` (drag from each node's output
     dot to the same input).
-13. After `Save email` add an **If** node `Urgent and angry?`, combinator **AND**:
-    - `{{ $json.urgency }}` **is equal to** `High`
-    - `{{ $json.sentiment }}` **is equal to** `Negative`
+14. After `Save email` add an **If** node `P1?` with one condition:
+    `{{ $json.priority }}` **String → is equal to** `P1`.
 
-    The Insert node outputs the saved row. Run it once (section "Check") and confirm `urgency` and
-    `sentiment` appear in its output; if they sit under another name, drag them from there.
-14. On the **true** output add **Telegram** → **Send Message**. Rename it `Telegram alert`.
+    The Insert node outputs the saved row. Run it once (section "Check") and confirm `priority`
+    appears in its output; if it sits under another name, drag it from there.
+15. On the **true** output add **Telegram** → **Send Message**. Rename it `Telegram alert`.
     - **Credential**: `RI Email`.
     - **Chat ID**: paste the chat ID you copied from `Format alert`.
     - **Text**:
 
       ```
-      Urgent and negative email
-      Mailbox: {{ $json.mailbox }}
+      🔴 P1 email: answer today
+      Mailbox: {{ $json.mailbox }} · {{ $json.type }} · {{ $json.mood }}
       From: {{ $json.from_name }} <{{ $json.from_address }}>
       Subject: {{ $json.subject }}
-      Summary: {{ $json.summary }}
+      {{ $json.summary }}
+      Next: {{ $json.next_step }}
       ```
 
-15. **Save** the workflow, then switch it **Active** (publish it). On this n8n version a workflow
+16. **Save** the workflow, then switch it **Active** (publish it). On this n8n version a workflow
     that calls it can only be published once this one is: n8n refused with "references workflow …
     which is not published. Please publish all referenced sub-workflows first." (seen 2026-11-16).
     Being active does not make it run by itself; it still only runs when a collector calls it.
@@ -230,13 +243,15 @@ Test with two made-up emails instead of real mail.
 
    | Email | Path | Result | Time |
    |---|---|---|---|
-   | Charged twice for November | false → `Sort with AI` | Billing · Negative · High; Telegram alert arrives | about **100 s** on the first run (the model is loading), about **25 s** on later runs |
-   | November product newsletter | true → `Rule tags` | Newsletter · Neutral · Low, summary = subject, `sorted_by` = `rule` | instant |
+   | Charged twice for November | false → `Sort with AI` | P1 · Complaint · Angry, needs a reply, next step like "Refund one payment today"; Telegram alert arrives | up to a few minutes on the first run (the model is loading), about **40-60 s** on later runs |
+   | November product newsletter | true → `Rule tags` | P3 · Marketing · Neutral, no reply needed, summary = subject, `sorted_by` = `rule` | under a second |
 
-   Measured on this server (design §5): first email after loading 99.1 s, then 22-30 s each.
+   Measured on this server with this schema (design §5): four AI-sorted test emails took 226 s
+   together including the model load, about 40-60 s each once loaded. The earlier, shorter
+   4-field schema took 22-30 s; the longer answer (summary plus next step) costs the extra time.
    A long wait on the first run is normal, not a fault.
-3. Open **Data tables** → `MailFlow emails`: two new rows with `status` = `new`.
-4. Your phone gets one Telegram message, for the billing email only.
+3. Open **Data tables** → `MailFlow emails`: two new rows with `status` = `open`.
+4. Your phone gets one Telegram message ("🔴 P1 email: answer today"), for the billing email only.
 5. Click **Execute workflow** again. This time both items stop at `Already saved?` (no output),
    no new rows, no second alert. Duplicate protection works.
 6. **Clean up**: in `MailFlow emails`, delete the two rows whose `mailbox` is `test@`. Then unpin
@@ -246,11 +261,11 @@ Test with two made-up emails instead of real mail.
 
 | Problem | What to do |
 |---|---|
-| `Sort with AI` runs for minutes | The first run loads Mistral (~100 s). If it goes past 3 minutes, Ollama may be busy with another workflow; it answers one request at a time. Wait and try again. |
+| `Sort with AI` runs for minutes | The first run loads Mistral (~100 s), then each email takes 40-60 s. If one email goes past 3 minutes, Ollama may be busy with another workflow; it answers one request at a time. Wait and try again. |
 | Error "could not parse" / output missing a field | Check Temperature is `0` and the schema was pasted whole, including `required`. |
-| Row saved but `category` etc. are empty | A field name in `AI tags` or `Rule tags` does not match the column. Compare letter by letter with lesson 1. |
+| Row saved but `type`, `priority` etc. are empty | A field name in `AI tags` or `Rule tags` does not match the column. Compare letter by letter with lesson 1. |
 | Nothing after `Already saved?` | That `message_id` is already in the table. Delete the test rows or change the id. |
-| No Telegram message | Check the chat ID was copied fully from `Format alert` and the credential is `RI Email`. Check `Urgent and angry?` used **AND**. |
+| No Telegram message | Check the chat ID was copied fully from `Format alert` and the credential is `RI Email`. Check `P1?` compares `{{ $json.priority }}` with `P1` (capital P). |
 | `received_at` error on insert | The value must be an ISO date like `2026-11-16T08:41:00+02:00`. Look at what the collector sent. |
 
 ## What you learned

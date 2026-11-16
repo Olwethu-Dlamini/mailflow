@@ -8,14 +8,14 @@ passwords or mailbox addresses in a file here.
 
 | # | Decision | Suggested default | Used in |
 |---|---|---|---|
-| D1 | The categories | Billing, Support, Sales, Internal, Newsletter, Other | Lesson 2 (the AI schema) and lesson 5 (the filter list) |
-| D2 | What "High urgency" means for the company | "Needs an answer today" | Lesson 2 |
+| D1 | The email types | Complaint, Question, Request, Order, Payment, Technical, Cancellation, Feedback, Marketing, Notification, Other | Lesson 2 (the AI schema) and lesson 5 (the `TYPES` filter list) |
+| D2 | What each priority means for the company | P1 answer today (angry customer, service down, money taken wrongly, threat to cancel or leave, legal); P2 answer this week; P3 no rush or no answer needed. Late after 4 h (P1) and 24 h (P2) | Lesson 2 (schema) and lesson 5 (`LATE_AFTER`) |
 | D3 | AI: local Mistral, or a cloud model with an API key | Local Mistral (mail stays on the server) | Lesson 2 |
 | D4 | If cloud: the company agrees that email text goes to that provider | — | Before lesson 2 |
 | D5 | Who may open the inbox page | One shared username and password for v1 | Lesson 5 |
 | D6 | Pages reachable on the tailnet only, or also from the internet with the password | Tailnet only | Lesson 5 |
 | D7 | How long to keep emails in MailFlow | 90 days | Lesson 9 |
-| D8 | Who gets the Telegram alerts for urgent and negative emails | You | Lesson 2 |
+| D8 | Who gets the Telegram alert for every P1 email | You | Lesson 2 |
 
 ## 2. The mailbox list (private)
 

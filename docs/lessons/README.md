@@ -11,12 +11,12 @@ them is in [SYSTEM-DESIGN.md](../SYSTEM-DESIGN.md). The decisions and logins you
 | # | Lesson | What works at the end | Time |
 |---|---|---|---|
 | 0 | [n8n basics](00-n8n-basics.md) | You can run a workflow, read its output, write an expression and pin data | 20 min |
-| 1 | [The email table](01-the-email-table.md) | The `MailFlow emails` data table exists with its 14 columns | 20 min |
+| 1 | [The email table](01-the-email-table.md) | The `MailFlow emails` data table exists with its 16 columns | 20 min |
 | 2 | [Process email](02-process-email.md) | `MailFlow · Process email` sorts a test email and saves it | 1 h 30 |
 | 3 | [First mailbox: work mail](03-first-mailbox-work-mail.md) | Real work mail lands in the table within about 2 minutes | 45 min |
 | 4 | [IMAP mailboxes](04-imap-mailboxes.md) | Every IMAP mailbox is sorted into the table | 30 min, then 5 min per mailbox |
-| 5 | [The inbox page](05-inbox-page.md) | One password-protected page lists all mail, with filters | 1 h 15 |
-| 6 | [The email page](06-email-page.md) | Click an email to read it; **Mark as done** works | 45 min |
+| 5 | [The inbox page](05-inbox-page.md) | One password-protected page lists what needs a reply, P1 first, with views and filters | 1 h 15 |
+| 6 | [The email page](06-email-page.md) | Click an email to read it; **Replied · waiting on customer**, **Done** and **Reopen** work | 45 min |
 | 7 | [Gmail](07-gmail.md) | Gmail / Google Workspace mailboxes are sorted | 1-2 h (mostly setup) |
 | 8 | [Microsoft 365](08-microsoft-365.md) | Microsoft 365 mailboxes are sorted | 1-2 h (mostly waiting on the admin) |
 | 9 | [Errors and cleanup](09-errors-and-cleanup.md) | Failures reach Telegram; rows older than 90 days are removed nightly | 45 min |

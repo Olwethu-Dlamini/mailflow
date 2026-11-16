@@ -25,7 +25,7 @@ make a throwaway workflow, run it, read its output, write one expression, pin da
    |---|---|---|
    | `from_address` | String | `sipho@example.com` |
    | `subject` | String | `Charged twice for November` |
-   | `urgency` | String | `High` |
+   | `priority` | String | `P1` |
 
 7. Close the node and click **Execute workflow** at the bottom of the canvas.
 8. Double-click **Edit Fields** again. The right side is the **output panel**. Try the three views:
@@ -39,7 +39,7 @@ make a throwaway workflow, run it, read its output, write one expression, pin da
 11. Now write an **expression** by hand. Add a field `alert`, type String, and type:
 
     ```
-    {{ $json.urgency === 'High' ? 'Look today: ' + $json.subject : 'Can wait' }}
+    {{ $json.priority === 'P1' ? 'Answer today: ' + $json.subject : 'Can wait' }}
     ```
 
     The grey preview under the box shows the result before you run anything.

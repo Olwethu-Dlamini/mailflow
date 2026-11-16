@@ -5,7 +5,7 @@
   <g font-size="14" fill="#1f2937">
     <circle cx="100" cy="140" r="16" fill="#6b7280"/><text x="94" y="145" fill="#fff" font-weight="bold">0</text>
     <text x="40" y="190" font-weight="bold">Prepare</text>
-    <text x="40" y="212" font-size="13" fill="#6b7280">mailbox list, categories,</text>
+    <text x="40" y="212" font-size="13" fill="#6b7280">mailbox list, email types,</text>
     <text x="40" y="230" font-size="13" fill="#6b7280">AI choice, logins</text>
 
     <circle cx="300" cy="140" r="16" fill="#7c3aed"/><text x="294" y="145" fill="#fff" font-weight="bold">1</text>
@@ -20,7 +20,7 @@
     <circle cx="700" cy="140" r="16" fill="#16a34a"/><text x="694" y="145" fill="#fff" font-weight="bold">3</text>
     <text x="630" y="190" font-weight="bold">Inbox page</text>
     <text x="630" y="212" font-size="13" fill="#6b7280">list, filters, email,</text>
-    <text x="630" y="230" font-size="13" fill="#6b7280">Done button (L5–L6)</text>
+    <text x="630" y="230" font-size="13" fill="#6b7280">status buttons (L5–L6)</text>
 
     <circle cx="900" cy="140" r="16" fill="#3b82f6"/><text x="894" y="145" fill="#fff" font-weight="bold">4</text>
     <text x="830" y="190" font-weight="bold">Gmail + Microsoft</text>

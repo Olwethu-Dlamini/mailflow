@@ -175,16 +175,18 @@ bullets(s, Inches(0.6), Inches(1.8), Inches(12), Inches(5), [
 # 3 The goal ----------------------------------------------------------------
 s = slide("The goal: what version 1 does", SLATE, (
     "Version 1 does exactly four things. It collects every new email from every connected mailbox. "
-    "It gives each one a category, a mood, an urgency and a one-line summary. It shows all of them on "
-    "one web page, newest first, with filters and a Done button. And it sends a Telegram alert when "
-    "an email is both urgent and negative. Important: the mailboxes themselves do not change. Nothing "
+    "It sorts each one for customer service: what kind of email it is, a priority from P1, answer "
+    "today, to P3, no rush, the sender's mood, whether it needs a reply, a one-line summary and the "
+    "next step. It shows them on one web page as a queue: what needs a reply, P1 first, with each "
+    "email moving from open to waiting on the customer to done. And it sends a Telegram alert for "
+    "every P1 email. Important: the mailboxes themselves do not change. Nothing "
     "is moved, deleted or marked as read; people keep using their normal mail apps. Replying, "
     "assigning and per-person logins come later."), "Why")
 bullets(s, Inches(0.6), Inches(1.8), Inches(12.1), Inches(4.3), [
     ("Collect ", "every new email from every connected mailbox, whatever the provider."),
-    ("Sort ", "each one: category, sentiment, urgency and a one-line summary."),
-    ("Show ", "all of them on one web page, newest first, with filters and a Done button."),
-    ("Alert ", "on Telegram when an email is urgent and negative."),
+    ("Sort ", "each one: type, priority P1-P3, mood, needs a reply, summary, next step."),
+    ("Show ", "one queue: needs a reply, P1 first; open \u2192 waiting on customer \u2192 done."),
+    ("Alert ", "on Telegram for every P1 email (answer today)."),
 ], size=24, accent=PURPLE)
 text(s, Inches(0.6), Inches(5.75), Inches(12.1), Inches(1.1), [
     "Unchanged: the mailboxes. Nothing is moved, deleted or marked read.",
@@ -207,15 +209,15 @@ s = slide("One email's journey", PURPLE, (
     "mail-poll for the old POP3 server. Step 2: the collector hands it to Process email in the common "
     "shape. Step 3: Process email checks the table: if this email is already saved, it stops, so a "
     "collector running twice does no harm. Step 4: newsletters and no-reply mail are tagged by rules; "
-    "everything else goes to the AI, which returns category, sentiment, urgency and summary, and the "
-    "row is saved. Step 5: if it is urgent and negative, a Telegram alert goes out; the inbox page "
-    "reads the rows for the list."), "Processing")
+    "everything else goes to the AI, which returns type, priority, mood, needs a reply, summary and "
+    "next step, and the row is saved. Step 5: if it is P1, answer today, a Telegram alert goes out; "
+    "the inbox page reads the rows for the queue."), "Processing")
 steps = [
     ("New email", "The collector notices it (push, poll or mail-poll)."),
     ("Common shape", "The collector hands it to Process email."),
     ("Already saved?", "If the row exists, stop. No duplicates."),
     ("Sort and save", "Rules tag obvious mail; the AI tags the rest."),
-    ("Alert and show", "Urgent + negative \u2192 Telegram. The page reads the table."),
+    ("Alert and show", "P1 \u2192 Telegram. The page reads the table."),
 ]
 cw, gap, top = Inches(2.3), Inches(0.12), Inches(2.1)
 for i, (head, body) in enumerate(steps):
@@ -235,10 +237,12 @@ for i, (head, body) in enumerate(steps):
 
 # 6 What the team sees ------------------------------------------------------
 s = slide("What the team sees", GREEN, (
-    "This is the inbox page. Every email from every mailbox, newest first. Each line shows the "
-    "mailbox, the sender, the subject, the AI's one-line summary and coloured tags for category, mood "
-    "and urgency. Filters at the top narrow it by mailbox, category, mood and status. Clicking an "
-    "email opens it with its tags and a Mark as done button. The page is protected by a password. "
+    "This is the inbox page. By default it shows what needs a reply, P1 first, then oldest first. "
+    "Each line shows the priority, the sender, chips for type, mood and mailbox, the subject, the AI's "
+    "summary and the next step, and how long it has waited: that label turns red after 4 hours for P1 "
+    "and 24 hours for P2. On the left: views for needs reply, P1, waiting on customer, done and "
+    "everything, and filters by mailbox, type and mood. Clicking an email opens it with buttons for "
+    "Replied, waiting on customer, and Done. The page is protected by a password. "
     "The first version may look plainer than this mock-up."), "Pages")
 picture(s, "inbox-mockup.png")
 
@@ -252,47 +256,50 @@ s = slide("The n8n workflows", PURPLE, (
 picture(s, "workflows.png")
 
 # 8 The AI ------------------------------------------------------------------
-s = slide("The AI: four answers per email", PURPLE, (
-    "For every email that the rules do not catch, the AI answers four questions in one call: the "
-    "category, from a fixed list we choose; the sender's mood; the urgency, where High means it needs "
-    "an answer today; and a summary of at most 15 words. Temperature is zero, so the same email always "
-    "gets the same answer. The default is Mistral running locally with Ollama: nothing extra to pay "
-    "and the email never leaves our server, but it takes 22 to 30 seconds per email. A cloud model is "
+s = slide("The AI: six answers per email", PURPLE, (
+    "For every email that the rules do not catch, the AI answers six questions in one call: the type, "
+    "from a fixed list we choose; the priority, P1 answer today, P2 this week, P3 no rush; the "
+    "sender's mood; whether a person must reply; a summary of at most 15 words; and the next step for "
+    "our staff. Temperature is zero, so the same email always gets the same answer. The default is "
+    "Mistral running locally with Ollama: nothing extra to pay and the email never leaves our server, "
+    "but it takes 40 to 60 seconds per email once loaded. A cloud model is "
     "a few seconds and fractions of a cent per email, but the text goes to that provider, so it needs "
     "the company's OK. Swapping is one node."), "Processing")
 bullets(s, Inches(0.6), Inches(1.75), Inches(12.1), Inches(2.4), [
-    ("Category: ", "Billing, Support, Sales, Internal, Newsletter, Other"),
-    ("Mood: ", "Positive, Neutral, Negative"),
-    ("Urgency: ", "High (needs an answer today), Normal, Low"),
-    ("Summary: ", "one short sentence, at most 15 words"),
-], size=20, accent=PURPLE)
+    ("Type: ", "Complaint, Question, Request, Order, Payment, Technical, Cancellation, Feedback, Marketing, Notification, Other"),
+    ("Priority: ", "P1 answer today \u00b7 P2 this week \u00b7 P3 no rush or no answer"),
+    ("Mood: ", "Angry, Frustrated, Neutral, Happy  \u00b7  Needs a reply: yes / no"),
+    ("Summary + next step: ", "at most 15 words; what staff should do, at most 12 words"),
+], size=18, accent=PURPLE)
 table(s, Inches(0.6), Inches(4.3), Inches(12.1), [
     ["Choice", "Speed per email", "Cost", "Email text goes"],
-    ["Ollama \u00b7 Mistral 7B on our server (default)", "22-30 s warm; 99 s first email",
+    ["Ollama \u00b7 Mistral 7B on our server (default)", "40-60 s warm (22-30 s with 4 fields)",
      "Nothing extra", "Stays on the server"],
     ["Cloud model (Groq, OpenAI, OpenRouter)", "A few seconds", "Fractions of a cent", "To that provider"],
 ], [Inches(4.6), Inches(3.1), Inches(2.2), Inches(2.2)], PURPLE, size=18, row_h=Inches(0.62))
 
 # 9 Measured ----------------------------------------------------------------
 s = slide("Measured on our server", PURPLE, (
-    "We tested this on our own server on 16 November 2026 with four test emails, local Mistral and "
-    "temperature zero. Category and mood were right on all four. The first email took 99 seconds "
-    "because the model had to load; after that, 22 to 30 seconds. Warm, Mistral sorts about 120 to "
-    "160 emails an hour. At 1,000 emails a day that is about 42 an hour on average, so it keeps up, "
-    "though morning peaks will queue for a while. In real use the newsletter would be caught by the "
-    "rules and never reach the AI."), "Processing")
+    "We tested the customer-service sorting on our own server on 16 November 2026 with four test "
+    "emails, local Mistral and temperature zero. The two angry emails, a double charge and an outage, "
+    "came out P1 Complaint Angry; the quote and the cancellation came out P2, each with a sensible "
+    "next step. The four took 226 seconds in one batch, including loading the model: about 40 to 60 "
+    "seconds each once warm. An earlier, shorter schema with four fields took 22 to 30 seconds; the "
+    "summary and next step cost the extra time. Warm, that is about 60 to 90 emails an hour; 1,000 a "
+    "day is about 42 an hour, so it keeps up, though morning peaks queue. Mail caught by the rules, "
+    "newsletters and notifications, takes under a second."), "Processing")
 table(s, Inches(0.6), Inches(1.75), Inches(12.1), [
-    ["Test email", "Answer", "Time"],
-    ["Charged twice for November", "Billing \u00b7 Negative \u00b7 High", "99.1 s (model loading)"],
-    ["Quote for 20 office routers", "Sales \u00b7 Positive \u00b7 High", "29.8 s"],
-    ["November product newsletter", "Newsletter \u00b7 Neutral \u00b7 Normal", "24.5 s"],
-    ["Re: connection problem", "Support \u00b7 Positive \u00b7 Normal", "21.6 s"],
-], [Inches(4.4), Inches(4.6), Inches(3.1)], PURPLE, size=20, row_h=Inches(0.6))
+    ["Test email", "Answer", "Next step"],
+    ["Charged twice for November", "P1 \u00b7 Complaint \u00b7 Angry", "Refund one payment today"],
+    ["Quote for 20 office routers", "P2 \u00b7 Order \u00b7 Neutral", "Send pricing and lead time"],
+    ["Internet down since yesterday", "P1 \u00b7 Complaint \u00b7 Angry", "Investigate and fix internet issue"],
+    ["Cancel my subscription", "P2 \u00b7 Cancellation \u00b7 Neutral", "Cancel subscription at end of month"],
+], [Inches(3.9), Inches(3.7), Inches(4.5)], PURPLE, size=18, row_h=Inches(0.6))
 text(s, Inches(0.6), Inches(5.45), Inches(12.1), Inches(0.5),
-     "Category and mood right on all four.", size=20, bold=True)
+     "4 emails in 226 s including the model load: about 40-60 s each when warm.", size=20, bold=True)
 text(s, Inches(0.6), Inches(6.0), Inches(12.1), Inches(1.0), [
-    "Warm: about 120-160 emails an hour once loaded.",
-    "1,000 emails a day is about 42 an hour on average: it keeps up; morning peaks queue."],
+    "Earlier 4-field schema: 22-30 s. Rule-sorted mail: under a second.",
+    "Warm: about 60-90 emails an hour; 1,000 a day is about 42 an hour: it keeps up; peaks queue."],
     size=20, color=SLATE)
 
 # 10 Security ---------------------------------------------------------------
@@ -314,15 +321,15 @@ bullets(s, Inches(0.6), Inches(1.8), Inches(12.1), Inches(5), [
 # 11 What we need -----------------------------------------------------------
 s = slide("What we need", SLATE, (
     "To build this I need a few things only you or the company's admins can give. First, decisions: "
-    "the categories, what High urgency means, local or cloud AI, who may open the page, how long to "
-    "keep email, and who gets the alerts. Second, the private mailbox list with a login for each: "
+    "the email types, what P1, P2 and P3 mean, local or cloud AI, who may open the page, how long to "
+    "keep email, and who gets the P1 alerts. Second, the private mailbox list with a login for each: "
     "server and password or app password for IMAP, a Google Cloud project for Gmail, and for Microsoft "
     "365 an Entra admin who registers an app with Mail.Read permission. Third, a few small server "
     "changes that I prepare and you run. None of this goes into the public repo."), "Plan")
 cols = [
-    ("Decisions", PURPLE, ["Categories", "What \"High urgency\" means",
+    ("Decisions", PURPLE, ["Email types", "What P1 / P2 / P3 mean",
                            "Local or cloud AI", "Who opens the page",
-                           "Keep mail how long (90 days)", "Who gets alerts"]),
+                           "Keep mail how long (90 days)", "Who gets P1 alerts"]),
     ("Logins per provider", CYAN, ["IMAP: server, user, (app) password",
                                    "POP3: one mail-poll each",
                                    "Gmail: a Google Cloud project",
@@ -345,9 +352,9 @@ for i, (head, acc, items) in enumerate(cols):
 # 12 Rollout ----------------------------------------------------------------
 s = slide("Rollout", GREEN, (
     "We roll out in steps, and each step ends with something that works. Phase 0: prepare the mailbox "
-    "list, categories, AI choice and logins. Phase 1, lessons 1 to 3: the work mailbox sorted into the "
+    "list, email types, AI choice and logins. Phase 1, lessons 1 to 3: the work mailbox sorted into the "
     "table. Phase 2, lesson 4: every IMAP mailbox. Phase 3, lessons 5 and 6: everyone sees all mail on "
-    "one page with a Done button. Phase 4, lessons 7 and 8: Gmail and Microsoft connected. Phase 5, "
+    "one page, P1 first, with status buttons. Phase 4, lessons 7 and 8: Gmail and Microsoft connected. Phase 5, "
     "lessons 9 and 10: error alerts, cleanup and the go-live checklist. Replying, assigning and "
     "per-person logins come later."), "Plan")
 picture(s, "rollout.png", top=Inches(1.65), max_h=Inches(3.3))
