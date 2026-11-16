@@ -31,7 +31,12 @@ Email Trigger (IMAP) → MailFlow shape → Process email
      mail app. Never choose Mark as Read.
    - **Download Attachments**: off (v1 does not use attachments).
    - **Format**: **Resolved** (the email is parsed into fields).
-   - Leave **Custom Email Rules** empty: the default fetches unread (UNSEEN) mail.
+   - **Options** → **Custom Email Rules**: `["ALL", ["SINCE", "16-Nov-2026"]]` with **today's**
+     date. **Do not leave it empty.** Empty means "every unread email in the inbox": the Gmail
+     inbox had **2,448** unread emails on 2026-11-16, which would have meant ~17 hours of AI work
+     and a flood of alerts. `ALL` + `SINCE` takes every email from today on, read or not.
+   - **Options** → **Track Last Message ID**: on (the default). After the first fetch n8n
+     remembers the newest email and only fetches newer ones, so the old date stops mattering.
 5. Click **Execute step** (or **Fetch test event**) and, if needed, send a test email to the
    mailbox so one item appears. You need a real item in the output to see the field names.
 6. Add **Edit Fields (Set)** after the trigger. Rename it `MailFlow shape`. Manual Mapping,
@@ -89,7 +94,8 @@ Email Trigger (IMAP) → MailFlow shape → Process email
 | Active, but nothing arrives | Some servers do not push new mail (IMAP IDLE). Try **Force Reconnect Every Minutes** in the options. The old work server is the known example; that is why it uses POP3. |
 | `from_address` or `subject` empty | The field name differs from the expected one. Drag it from the trigger output. |
 | Emails got marked as read | **Action** is not **None**. Fix it. |
-| Mail read in an app while n8n was down is missing | Expected: the trigger fetches unread mail only (design §2.1). |
+| Mail read in an app while n8n was down is missing | Should not happen with `ALL` + Track Last Message ID; if Custom Email Rules was left empty (unread only), it does. |
+| First start fetched hundreds of old emails | Custom Email Rules was empty. Deactivate, set `["ALL", ["SINCE", "<today>"]]`, delete the extra rows. |
 
 ## What you learned
 

@@ -11,10 +11,10 @@ picture: [workflows.png](../images/workflows.png).
 When you are done the canvas looks like this:
 
 ```
-When Executed by Another Workflow → Already saved? → Obvious mail? ─true──→ Rule tags ──────────┐
-                                                                  └false─→ Sort with AI → AI tags ┴→ Save email → Urgent and angry? ─true→ Telegram alert
-                                                                              ↑
-                                                                      Ollama Chat Model
+When Executed by Another Workflow → Has message id? → Already saved? → Obvious mail? ─true──→ Rule tags ─────────────────────────┐
+                                                                                   └false─→ Sort with AI ─→ Email + AI answer → AI tags ┴→ Save email → Urgent and angry? ─true→ Telegram alert
+                                                                                        └──────────────────↗        ↑
+                                                                                                         Ollama Chat Model (under Sort with AI)
 ```
 
 ## What you need
@@ -41,6 +41,11 @@ When Executed by Another Workflow → Already saved? → Obvious mail? ─true�
 4. Open the workflow **Settings** (⋯ menu → **Settings**) and check **This workflow can be called
    by** allows your other workflows (the default, workflows in the same project, is fine if all
    MailFlow workflows live in one place).
+
+   4b. Add a **Filter** node right after the trigger. Rename it `Has message id?`. Condition:
+   `{{ $json.message_id }}` **String → is not empty**. This stops a test run with no email (for
+   example clicking **Execute workflow** with nothing pinned) from saving an empty row: that
+   happened once on 2026-11-16.
 
 ### B. Skip emails already saved
 
@@ -125,20 +130,29 @@ When Executed by Another Workflow → Already saved? → Obvious mail? ─true�
    - **Options** → **Add Option** → **Sampling Temperature** → `0`. Temperature 0 means the same
      email always gets the same answer.
 
-10. After `Sort with AI` add **Edit Fields (Set)**. Rename it `AI tags`. Manual Mapping, **Include
-    Other Input Fields** off. The AI node only outputs `output`, so the email's own fields are read
-    back from the trigger node by name:
+10. Add a **Merge** node. Rename it `Email + AI answer`. **Mode**: Combine. **Combine By**:
+    Position.
+    - Connect the **false** output of `Obvious mail?` to its **Input 1** (a second line from the
+      same output; the first still goes to `Sort with AI`).
+    - Connect `Sort with AI` to its **Input 2**.
+
+    The AI node only outputs `output`. The Merge puts each email and its AI answer back together,
+    first with first, second with second, so nothing gets mixed up when several emails arrive at
+    once.
+
+11. After the Merge add **Edit Fields (Set)**. Rename it `AI tags`. Manual Mapping, **Include
+    Other Input Fields** off. Now everything is in `$json`:
 
     | Name | Value |
     |---|---|
-    | `message_id` | `{{ $('When Executed by Another Workflow').item.json.message_id }}` |
-    | `mailbox` | `{{ $('When Executed by Another Workflow').item.json.mailbox }}` |
-    | `source` | `{{ $('When Executed by Another Workflow').item.json.source }}` |
-    | `from_name` | `{{ $('When Executed by Another Workflow').item.json.from_name }}` |
-    | `from_address` | `{{ $('When Executed by Another Workflow').item.json.from_address }}` |
-    | `subject` | `{{ $('When Executed by Another Workflow').item.json.subject }}` |
-    | `received_at` | `{{ $('When Executed by Another Workflow').item.json.received_at }}` |
-    | `body` | `{{ ($('When Executed by Another Workflow').item.json.body \|\| '').slice(0, 4000) }}` |
+    | `message_id` | `{{ $json.message_id }}` |
+    | `mailbox` | `{{ $json.mailbox }}` |
+    | `source` | `{{ $json.source }}` |
+    | `from_name` | `{{ $json.from_name }}` |
+    | `from_address` | `{{ $json.from_address }}` |
+    | `subject` | `{{ $json.subject }}` |
+    | `received_at` | `{{ $json.received_at }}` |
+    | `body` | `{{ ($json.body \|\| '').slice(0, 4000) }}` |
     | `category` | `{{ $json.output.category }}` |
     | `sentiment` | `{{ $json.output.sentiment }}` |
     | `urgency` | `{{ $json.output.urgency }}` |
@@ -146,7 +160,8 @@ When Executed by Another Workflow → Already saved? → Obvious mail? ─true�
     | `sorted_by` | `ai` |
     | `status` | `new` |
 
-    Tip: drag `output → category` etc. from the input panel rather than typing.
+    Tip: drag `output → category` etc. from the input panel rather than typing. (Steps below keep
+    their numbers; read "12" for the next one if you count.)
 
 ### E. Save and alert
 
