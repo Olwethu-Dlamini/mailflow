@@ -189,7 +189,7 @@ const list = rows.map((r) => {
         <span class="chip">${esc(r.type)}</span>
         <span class="chip mood ${moodClass[r.mood] || ''}">${esc(r.mood)}</span>
         <span class="chip box">${esc(r.mailbox)}</span>
-        ${st === 'waiting' ? '<span class="chip wait">waiting on customer</span>' : ''}
+        <span class="chip st ${esc(st)}">${esc({ open: 'Open', waiting: 'Waiting on customer', done: 'Done' }[st] || st)}</span>
       </span>
       <span class="subject">${esc(r.subject)}</span>
       <span class="summary">${esc(r.summary)}</span>
@@ -235,7 +235,9 @@ const html = `<!DOCTYPE html>
   .from { font-weight: 600; }
   .chip { font-size: 12px; background: #eef1f5; padding: 1px 8px; border-radius: 10px; }
   .chip.box { background: #fff; border: 1px solid #d0d7de; }
-  .chip.wait { background: #ddf4ff; color: #0550ae; }
+  .chip.st.open { background: #fff8c5; color: #7d4e00; }
+  .chip.st.waiting { background: #ddf4ff; color: #0550ae; }
+  .chip.st.done { background: #dafbe1; color: #116329; }
   .mood.angry { background: #ffebe9; color: #a40e26; }
   .mood.frustrated { background: #fff1e5; color: #953800; }
   .mood.happy { background: #dafbe1; color: #116329; }
