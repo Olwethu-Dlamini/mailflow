@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" font-family="Helvetica, Arial, sans-serif">
+  <rect width="1200" height="640" fill="#ffffff"/>
+  <text x="40" y="48" font-size="28" font-weight="bold" fill="#1f2937">MailFlow: how it fits together</text>
+  <text x="40" y="76" font-size="16" fill="#6b7280">Everything runs inside n8n on the company server `ai`; mail stays in the company's own mailboxes.</text>
+
+  <!-- mailboxes -->
+  <text x="40" y="128" font-size="15" font-weight="bold" fill="#374151">1. MAILBOXES</text>
+  <g font-size="15" fill="#1f2937">
+    <rect x="40" y="142" width="220" height="62" rx="10" fill="#fee2e2" stroke="#ef4444"/>
+    <text x="56" y="170" font-weight="bold">Gmail / Workspace</text><text x="56" y="192" font-size="13" fill="#6b7280">Google login (OAuth)</text>
+    <rect x="40" y="220" width="220" height="62" rx="10" fill="#dbeafe" stroke="#3b82f6"/>
+    <text x="56" y="248" font-weight="bold">Microsoft 365</text><text x="56" y="270" font-size="13" fill="#6b7280">Entra app (no password)</text>
+    <rect x="40" y="298" width="220" height="62" rx="10" fill="#dcfce7" stroke="#22c55e"/>
+    <text x="56" y="326" font-weight="bold">IMAP mailboxes</text><text x="56" y="348" font-size="13" fill="#6b7280">host, user, app password</text>
+    <rect x="40" y="376" width="220" height="62" rx="10" fill="#fef3c7" stroke="#f59e0b"/>
+    <text x="56" y="404" font-weight="bold">Old POP3 server</text><text x="56" y="426" font-size="13" fill="#6b7280">mail-poll on the VM</text>
+  </g>
+
+  <!-- collectors -->
+  <text x="320" y="128" font-size="15" font-weight="bold" fill="#374151">2. COLLECTORS (one small workflow each)</text>
+  <g font-size="14" fill="#1f2937">
+    <rect x="320" y="142" width="250" height="62" rx="10" fill="#f9fafb" stroke="#9ca3af"/>
+    <text x="336" y="170">Gmail Trigger</text><text x="336" y="192" font-size="12" fill="#6b7280">polls every minute</text>
+    <rect x="320" y="220" width="250" height="62" rx="10" fill="#f9fafb" stroke="#9ca3af"/>
+    <text x="336" y="248">Microsoft Outlook Trigger</text><text x="336" y="270" font-size="12" fill="#6b7280">polls every minute</text>
+    <rect x="320" y="298" width="250" height="62" rx="10" fill="#f9fafb" stroke="#9ca3af"/>
+    <text x="336" y="326">Email Trigger (IMAP)</text><text x="336" y="348" font-size="12" fill="#6b7280">pushed by the server (IDLE)</text>
+    <rect x="320" y="376" width="250" height="62" rx="10" fill="#f9fafb" stroke="#9ca3af"/>
+    <text x="336" y="404">Webhook</text><text x="336" y="426" font-size="12" fill="#6b7280">mail-poll posts each new email</text>
+  </g>
+  <g stroke="#9ca3af" stroke-width="2" marker-end="url(#a)">
+    <line x1="260" y1="173" x2="316" y2="173"/><line x1="260" y1="251" x2="316" y2="251"/>
+    <line x1="260" y1="329" x2="316" y2="329"/><line x1="260" y1="407" x2="316" y2="407"/>
+  </g>
+  <text x="330" y="470" font-size="13" fill="#6b7280">each one: tidy the fields into one shape,</text>
+  <text x="330" y="488" font-size="13" fill="#6b7280">then call "Process email"</text>
+
+  <!-- process -->
+  <rect x="630" y="142" width="270" height="296" rx="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+  <text x="646" y="172" font-size="16" font-weight="bold" fill="#4c1d95">3. MailFlow · Process email</text>
+  <g font-size="14" fill="#1f2937">
+    <text x="646" y="206">① already saved? → stop</text>
+    <text x="646" y="238">② rules: newsletter / no-reply</text>
+    <text x="664" y="256" font-size="12" fill="#6b7280">→ no AI needed</text>
+    <text x="646" y="288">③ Information Extractor</text>
+    <text x="664" y="306" font-size="12" fill="#6b7280">category · mood · urgency · summary</text>
+    <text x="646" y="338">④ save the row</text>
+    <text x="646" y="370">⑤ urgent + negative?</text>
+    <text x="664" y="388" font-size="12" fill="#6b7280">→ Telegram alert</text>
+  </g>
+  <g stroke="#7c3aed" stroke-width="2" marker-end="url(#a)">
+    <line x1="570" y1="173" x2="626" y2="230"/><line x1="570" y1="251" x2="626" y2="260"/>
+    <line x1="570" y1="329" x2="626" y2="300"/><line x1="570" y1="407" x2="626" y2="340"/>
+  </g>
+
+  <!-- AI -->
+  <rect x="630" y="476" width="270" height="74" rx="12" fill="#fff7ed" stroke="#ea580c"/>
+  <text x="646" y="504" font-size="15" font-weight="bold" fill="#9a3412">AI model (one node)</text>
+  <text x="646" y="528" font-size="13" fill="#6b7280">Ollama · Mistral on `ai` (local), or a</text>
+  <text x="646" y="544" font-size="13" fill="#6b7280">cloud key (Groq, OpenAI): swap it</text>
+  <line x1="765" y1="476" x2="765" y2="442" stroke="#ea580c" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- table -->
+  <rect x="960" y="142" width="200" height="140" rx="12" fill="#ecfeff" stroke="#0891b2" stroke-width="2"/>
+  <text x="976" y="172" font-size="16" font-weight="bold" fill="#155e75">4. Data table</text>
+  <text x="976" y="196" font-size="13" fill="#1f2937">"MailFlow emails"</text>
+  <text x="976" y="220" font-size="12" fill="#6b7280">one row per email:</text>
+  <text x="976" y="238" font-size="12" fill="#6b7280">who, subject, text,</text>
+  <text x="976" y="256" font-size="12" fill="#6b7280">category, mood, status</text>
+  <line x1="900" y1="290" x2="956" y2="220" stroke="#0891b2" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- web page -->
+  <rect x="960" y="320" width="200" height="118" rx="12" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+  <text x="976" y="350" font-size="16" font-weight="bold" fill="#14532d">5. Inbox page</text>
+  <text x="976" y="374" font-size="13" fill="#1f2937">one list for every</text>
+  <text x="976" y="392" font-size="13" fill="#1f2937">mailbox, with filters</text>
+  <text x="976" y="416" font-size="12" fill="#6b7280">n8n Webhook + password</text>
+  <line x1="1060" y1="282" x2="1060" y2="316" stroke="#16a34a" stroke-width="2" marker-end="url(#a)"/>
+
+  <!-- side jobs -->
+  <rect x="960" y="476" width="200" height="74" rx="12" fill="#f9fafb" stroke="#9ca3af"/>
+  <text x="976" y="504" font-size="14" font-weight="bold" fill="#374151">Side jobs</text>
+  <text x="976" y="524" font-size="12" fill="#6b7280">errors → Telegram</text>
+  <text x="976" y="540" font-size="12" fill="#6b7280">nightly cleanup (90 days)</text>
+
+  <text x="40" y="600" font-size="13" fill="#6b7280">Arrows show the path of one new email. The original email is never deleted or moved; MailFlow keeps a copy of the text for the page.</text>
+  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker></defs>
+</svg>
