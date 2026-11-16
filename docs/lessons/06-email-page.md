@@ -38,6 +38,8 @@ Status webhook (GET mailflow/status) → Set status → Respond status
 // MailFlow · Email page → Build page (customer-service view)
 const id = String(($('Webhook').first().json.query || {}).id || '');
 const TIME_ZONE = 'Africa/Mbabane';
+// Mailboxes that can be answered from this page (MailFlow · Reply sends through the Gmail node).
+const REPLY_MAILBOXES = ['gmail'];
 
 function esc(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -82,7 +84,15 @@ const content = row ? `
     ${needsReply ? `<p class="next">Next step: ${esc(row.next_step)}</p>` : ''}
   </div>
   <div class="body">${esc(row.body).replace(/\n/g, '<br>')}</div>
-  <p class="hint">Reply from the <b>${esc(row.mailbox)}</b> mailbox in your mail app, then mark it here.</p>
+  ${REPLY_MAILBOXES.includes(row.mailbox) && status !== 'done' ? `
+  <form class="reply" method="post" action="reply">
+    <input type="hidden" name="id" value="${esc(row.message_id)}">
+    <label for="text">Reply to ${esc(row.from_name || row.from_address)} from the <b>${esc(row.mailbox)}</b> mailbox</label>
+    <textarea id="text" name="text" rows="7" required placeholder="Write your reply…"></textarea>
+    <button type="submit">Send reply</button>
+    <span class="hint">Sent as a reply in the same Gmail conversation; the email then moves to Waiting on customer.</span>
+  </form>`
+  : `<p class="hint">Reply from the <b>${esc(row.mailbox)}</b> mailbox in your mail app, then mark it here.</p>`}
   <div class="actions">${buttons}</div>`
   : '<h1>This email was not found.</h1><p>It may have been cleaned up after 90 days.</p>';
 
@@ -115,6 +125,10 @@ const html = `<!DOCTYPE html>
   .btn.wait { background: #0969da; color: #fff; }
   .btn.done { background: #1a7f37; color: #fff; }
   .btn.plain { background: #fff; color: #1f2328; border: 1px solid #d0d7de; }
+  .reply { background: #fff; border: 1px solid #e1e4e8; border-radius: 8px; padding: 12px 14px; margin: 14px 0; display: flex; flex-direction: column; gap: 8px; }
+  .reply label { font-size: 14px; color: #57606a; }
+  .reply textarea { font: inherit; padding: 8px; border: 1px solid #d0d7de; border-radius: 6px; resize: vertical; }
+  .reply button { align-self: flex-start; background: #0969da; color: #fff; border: 0; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -177,6 +191,41 @@ browser turns it into `/webhook/mailflow/status?id=…&to=…`.
    The page lives at `/webhook/mailflow/status`, so `../mailflow` is the inbox. The browser jumps
    there at once (meta refresh).
 9. **Save**, switch **Active**.
+
+### C. Reply from the page (Gmail mailbox)
+
+Built 2026-11-16. Emails that arrived in the `gmail` mailbox show a **reply box** on their page
+(the `REPLY_MAILBOXES` list at the top of the code above). Other mailboxes keep the "reply in your
+mail app" note until they get their own sender.
+
+It needs a **Gmail OAuth2 API** credential (here `MailFlow Gmail`), which needs n8n on an https
+address for Google's sign-in (`N8N_EDITOR_BASE_URL=https://ai.tail653118.ts.net/` and
+`tailscale serve --bg --https=443 http://127.0.0.1:5678` on `ai`), a Google Cloud project with the
+Gmail API, an External consent screen and your address under **Audience → Test users**.
+
+Workflow `MailFlow · Reply`:
+
+```
+Reply webhook (POST mailflow/reply, Basic Auth) → Get email → Can reply? ─true─→ Find in Gmail → Found? ─true─→ Send reply → Set waiting → Respond sent
+                                                              └false→ Respond cannot          └false→ Respond not found
+```
+
+| Node | Settings |
+|---|---|
+| `Reply webhook` | Webhook, **POST**, path `mailflow/reply`, Basic Auth `MailFlow page login`, Respond using Respond to Webhook. The form sends `id` and `text`, found in `$json.body` |
+| `Get email` | Data Table **Get**, `message_id` equals `{{ $json.body.id }}`, Limit 1, Always Output Data on |
+| `Can reply?` | If, AND: `{{ $json.mailbox }}` equals `gmail`; `{{ ($('Reply webhook').first().json.body.text \|\| '').trim() }}` is not empty |
+| `Find in Gmail` | **Gmail** → Message → **Get Many**, Limit 1, Filters → Search: `{{ 'rfc822msgid:' + String($json.message_id).replace(/^<\|>$/g, '') }}`. Always Output Data on. This turns the email's Message-ID into Gmail's own message id |
+| `Found?` | If `{{ $json.id }}` is not empty |
+| `Send reply` | **Gmail** → Message → **Reply**, Message ID `{{ $json.id }}`, Email Type Text, Message `{{ $('Reply webhook').first().json.body.text }}`, option Append n8n Attribution off. Gmail sends it in the same conversation (`In-Reply-To` set) and files it under Sent |
+| `Set waiting` | Data Table **Update**, `message_id` equals the form `id`, `status` = `waiting` |
+| `Respond …` | Respond to Webhook, Text, `Content-Type: text/html; charset=utf-8`, a short page that returns to `email?id=…` |
+
+Tested 2026-11-16 by sending a test email from the Gmail account to itself, collecting it, and
+replying from the page: the reply arrived with `In-Reply-To` pointing at the original, in the
+same Gmail conversation, and the row moved to **Waiting on customer**. A reply attempt on a
+`22112002` email answered "Not sent". (A reply to yourself also lands in your inbox, so MailFlow
+collects it as a new email: that only happens in self-tests.)
 
 ## Check it works
 

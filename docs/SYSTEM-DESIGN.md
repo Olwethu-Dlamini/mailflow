@@ -162,6 +162,14 @@ The page looks like this (the first version may be plainer):
 
 ![Inbox page](images/inbox-mockup.png)
 
+**Replying from the page (2026-11-16).** Emails in the `gmail` mailbox get a reply box. It posts
+to `MailFlow · Reply` (`/webhook/mailflow/reply`, same Basic Auth), which finds the email in
+Gmail by its Message-ID (`rfc822msgid:` search), sends the reply with the **Gmail** node's
+*Reply* operation so it threads and lands in Sent, and sets `status = waiting`. It uses the Gmail
+OAuth2 credential, which needed n8n on https (`N8N_EDITOR_BASE_URL`, Tailscale Serve on `ai`).
+Other mailboxes still say "reply in your mail app": n8n's Send Email node cannot set
+`In-Reply-To`, so those need their own threaded sender (e.g. the DDOService bridge) later.
+
 ## 3. One email's journey
 
 ```mermaid
@@ -343,6 +351,7 @@ MailFlow, raise it to `30m` in `/opt/automation/.env`: Mistral then holds about 
 | M7 | Pages as n8n **Webhook + HTML** | A separate web app | Stays in n8n; good enough for v1; a real app can read the same table later |
 | M8 | POP3 through **mail-poll** | n8n IMAP trigger | The trigger never fired on the old server (2026-10-15) |
 | M9 | **Customer-service fields** (type, P1-P3 priority, mood, needs a reply, next step) and statuses open → waiting → done (2026-11-16) | Category + sentiment + urgency (Positive/Negative sorting) | Tells staff what to do and what to answer first, instead of only describing the email; one shared queue for now (per-person assignment later, §9) |
+| M10 | Replies from the page through the **Gmail node** (Gmail mailbox only, 2026-11-16) | n8n Send Email node; extending the DDOService bridge | The owner's choice for now; the Gmail node threads replies and files them in Sent, Send Email cannot set `In-Reply-To`. Costs a Google Cloud project and n8n on https |
 
 ## 12. Risks
 
