@@ -174,8 +174,10 @@ When Executed by Another Workflow → Already saved? → Obvious mail? ─true�
       Summary: {{ $json.summary }}
       ```
 
-15. **Save** the workflow. A sub-workflow must be saved and error-free before others can call it.
-    Do not activate it: sub-workflows run when they are called.
+15. **Save** the workflow, then switch it **Active** (publish it). On this n8n version a workflow
+    that calls it can only be published once this one is: n8n refused with "references workflow …
+    which is not published. Please publish all referenced sub-workflows first." (seen 2026-11-16).
+    Being active does not make it run by itself; it still only runs when a collector calls it.
 
 ## Check it works
 
