@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2330 358" font-family="Helvetica, Arial, sans-serif">
 <rect width="2330" height="358" fill="#ffffff"/>
 <text x="40" y="48" font-size="26" font-weight="bold" fill="#1f2937">MailFlow · Reply</text>
-<text x="40" y="76" font-size="14" fill="#6b7280">POST /webhook/mailflow/reply: finds the email in Gmail, replies in the same thread, sets Waiting</text>
+<text x="40" y="76" font-size="14" fill="#6b7280">POST /webhook/mailflow/reply (header X-MailFlow-Secret, from the web app): finds the email in Gmail, replies in the same thread, sets Waiting, answers JSON</text>
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/></marker></defs>
 <path d="M260,145.0 C295.0,145.0 295.0,145.0 328,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>
 <path d="M550,145.0 C585.0,145.0 585.0,145.0 618,145.0" fill="none" stroke="#9ca3af" stroke-width="2" marker-end="url(#a)"/>

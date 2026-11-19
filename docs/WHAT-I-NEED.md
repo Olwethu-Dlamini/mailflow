@@ -12,8 +12,8 @@ passwords or mailbox addresses in a file here.
 | D2 | What each priority means for the company | P1 answer today (angry customer, service down, money taken wrongly, threat to cancel or leave, legal); P2 answer this week; P3 no rush or no answer needed. Late after 4 h (P1) and 24 h (P2) | Lesson 2 (schema) and lesson 5 (`LATE_AFTER`) |
 | D3 | AI: local Mistral, or a cloud model with an API key | Local Mistral (mail stays on the server) | Lesson 2 |
 | D4 | If cloud: the company agrees that email text goes to that provider | — | Before lesson 2 |
-| D5 | Who may open the inbox page | One shared username and password for v1 | Lesson 5 |
-| D6 | Pages reachable on the tailnet only, or also from the internet with the password | Tailnet only | Lesson 5 |
+| D5 | Who may open the inbox page | **Decided 2026-11-19:** one account per person in the MailFlow web app; you are admin and add people | Web app (M11) |
+| D6 | Pages reachable on the tailnet only, or also from the internet with the password | **Decided 2026-11-19:** on the internet at `https://mailflow.22112002.xyz`, behind the per-person logins | Web app (M11) |
 | D7 | How long to keep emails in MailFlow | 90 days | Lesson 9 |
 | D8 | Who gets the Telegram alert for every P1 email | You | Lesson 2 |
 
@@ -65,7 +65,8 @@ the mail settings in Outlook or a phone usually show the server (imap.… or pop
 |---|---|---|
 | `OLLAMA_KEEP_ALIVE=30m` in `/opt/automation/.env`, then `sudo bash deploy.sh` | Mistral stays loaded between emails (saves ~70 s each after a quiet gap) | Before go-live |
 | `N8N_DATA_TABLES_MAX_SIZE_BYTES=1073741824` (1 GiB) | Room for 90 days of mail at up to 1,000 a day | Once real volume is known |
-| A Caddy rule on srv1 blocking `/webhook/mailflow*` from the internet (if D6 = tailnet only) | The pages show company email | Lesson 5 |
+| The MailFlow web app on `ai`: `/opt/mailflow`, `.env`, `docker compose up -d --build` ([app/README.md](../app/README.md)) | The page staff work in | 2026-11-19 |
+| `mailflow.22112002.xyz` on srv1: DNS route, tunnel ingress line, Caddy block to `10.0.0.31:3100` | Publishes the web app through Cloudflare | 2026-11-19 |
 | HTTPS address for Google sign-in | Google refuses `http://ai:5678` | Before lesson 7 |
 | One `mail-poll` per extra POP3 mailbox | POP3 servers can't push | Lesson 3, if there are more |
 

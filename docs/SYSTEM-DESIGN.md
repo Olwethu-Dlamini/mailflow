@@ -139,8 +139,15 @@ The descriptions in the schema are the model's instructions, so P1/P2/P3 are def
 
 ### 2.4 The pages
 
-Both pages are n8n workflows that start with a **Webhook** node (method GET, authentication
-**Basic Auth**) and end with **Respond to Webhook** returning HTML.
+**Since 2026-11-19 the page is the MailFlow web app** ([`app/`](../app/), decision M11) at
+`https://mailflow.22112002.xyz`: one account per person, the same views, filters, sorting, late
+rule, status buttons and Gmail reply as below, in three panes (views and filters, the queue, the
+open email). It reads and updates the data table through n8n's API and calls `MailFlow · Reply`
+with a secret header. The n8n page workflows below were the first version; they are switched off
+once the app is live and kept for rollback.
+
+The first version: both pages are n8n workflows that start with a **Webhook** node (method GET,
+authentication **Basic Auth**) and end with **Respond to Webhook** returning HTML.
 
 | Page | Path | Does |
 |---|---|---|
@@ -163,9 +170,10 @@ The page looks like this (the first version may be plainer):
 ![Inbox page](images/inbox-mockup.png)
 
 **Replying from the page (2026-11-16).** Emails in the `gmail` mailbox get a reply box. It posts
-to `MailFlow · Reply` (`/webhook/mailflow/reply`, same Basic Auth), which finds the email in
-Gmail by its Message-ID (`rfc822msgid:` search), sends the reply with the **Gmail** node's
-*Reply* operation so it threads and lands in Sent, and sets `status = waiting`. It uses the Gmail
+to `MailFlow · Reply` (`/webhook/mailflow/reply`; since 2026-11-19 Header Auth `X-MailFlow-Secret`,
+credential `MailFlow app secret`, answering JSON `{"result": "sent" | "cannot" | "not_found"}`),
+which finds the email in Gmail by its Message-ID (`rfc822msgid:` search), sends the reply with the
+**Gmail** node's *Reply* operation so it threads and lands in Sent, and sets `status = waiting`. It uses the Gmail
 OAuth2 credential, which needed n8n on https (`N8N_EDITOR_BASE_URL`, Tailscale Serve on `ai`).
 Other mailboxes still say "reply in your mail app": n8n's Send Email node cannot set
 `In-Reply-To`, so those need their own threaded sender (e.g. the DDOService bridge) later.
@@ -298,8 +306,8 @@ MailFlow, raise it to `30m` in `/opt/automation/.env`: Mistral then holds about 
 
 | Risk | Control |
 |---|---|
-| The pages show company email | Webhook **Basic Auth** on both pages, a strong password; the address is only shared inside the company |
-| n8n's webhooks are reachable from the internet through `https://n8n.22112002.xyz/webhook/…` (DDOService decision D16) | Recommended: add a rule on srv1's Caddy that blocks `/webhook/mailflow*` from the internet, so the pages work only on the tailnet (`http://ai:5678/webhook/mailflow`) |
+| The page shows company email, on the internet | The web app (M11): one account per person, scrypt passwords of 12+ characters; 5 failed logins lock an email and 20 lock a visitor's address for 15 min; HttpOnly, Secure, SameSite=Strict session cookie (12 h idle, 7 days); changes need the page's own header and origin; strict Content Security Policy; email text shown only as text. Reached only through Cloudflare and srv1 (the port is bound to ai's LAN address) |
+| n8n's webhooks are reachable from the internet through `https://n8n.22112002.xyz/webhook/…` (DDOService decision D16) | `MailFlow · Reply` needs the `X-MailFlow-Secret` header (403 without it); the old page webhooks are switched off. The n8n API key the app uses stays on the server |
 | Mailbox passwords and keys | Only in n8n credentials (encrypted in n8n's database); never in workflows, exports or this repo |
 | Email text sent to an AI | Default is local Ollama: nothing leaves the server. A cloud model needs the company's OK first |
 | The POP3 webhook could be called by anyone | Header Auth credential (secret header), like `Work email webhook secret` today |
@@ -328,7 +336,7 @@ MailFlow, raise it to `30m` in `/opt/automation/.env`: Mistral then holds about 
 | 3. Inbox page | Everyone can see what needs a reply on one page, P1 first; status buttons | 5-6 |
 | 4. Gmail + Microsoft | All providers connected | 7-8 |
 | 5. Go live | Error alerts, cleanup, checklist passed | 9-10 |
-| Later | Reply from the page; assign to a person; per-person logins; daily summary; attachments | — |
+| Later | Assign to a person; who-did-what log; replies from mailboxes other than Gmail; daily summary; attachments. Done 2026-11-16/19: reply from the page (Gmail), per-person logins (web app) | — |
 
 ## 10. Conventions
 
@@ -336,7 +344,7 @@ MailFlow, raise it to `30m` in `/opt/automation/.env`: Mistral then holds about 
 - **Exports:** workflows are exported to the private `n8n-chatbot` repo, folder `mailflow/`,
   with its `tools/n8n-sync.py` (add `"MailFlow": "mailflow"` to its project list). Exports name
   credentials only, never secrets.
-- **This repo:** design, lessons, deck, pictures. No addresses, passwords or email content.
+- **This repo:** design, lessons, deck, pictures and the web app. No addresses, passwords, `.env` files or email content.
 
 ## 11. Decisions
 
@@ -352,6 +360,7 @@ MailFlow, raise it to `30m` in `/opt/automation/.env`: Mistral then holds about 
 | M8 | POP3 through **mail-poll** | n8n IMAP trigger | The trigger never fired on the old server (2026-10-15) |
 | M9 | **Customer-service fields** (type, P1-P3 priority, mood, needs a reply, next step) and statuses open → waiting → done (2026-11-16) | Category + sentiment + urgency (Positive/Negative sorting) | Tells staff what to do and what to answer first, instead of only describing the email; one shared queue for now (per-person assignment later, §9) |
 | M10 | Replies from the page through the **Gmail node** (Gmail mailbox only, 2026-11-16) | n8n Send Email node; extending the DDOService bridge | The owner's choice for now; the Gmail node threads replies and files them in Sent, Send Email cannot set `In-Reply-To`. Costs a Google Cloud project and n8n on https |
+| M11 | The page as a **separate web app** (FastAPI, plain HTML/JS, one container on `ai`) at `mailflow.22112002.xyz`, **one account per person** (2026-11-19) | Keep n8n Webhook + HTML pages with Basic Auth (M7); a shared login; Google sign-in; Tailscale identity | The owner wants a real site, public on the company domain, with n8n as the engine. Per-person accounts allow "who did what" and assignment later. FastAPI like ollagi, ~60 MB of the VM's memory; n8n keeps every mailbox login and the AI |
 
 ## 12. Risks
 

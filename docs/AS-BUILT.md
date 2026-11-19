@@ -1,8 +1,8 @@
 # MailFlow as built
 
-What is actually running in n8n on `ai`, as of **16 November 2026**. The design
-([SYSTEM-DESIGN.md](SYSTEM-DESIGN.md)) also covers the parts still planned; this page shows only
-what exists.
+What is actually running on `ai`, as of **19 November 2026**: the n8n workflows and, since that
+day, the MailFlow web app. The design ([SYSTEM-DESIGN.md](SYSTEM-DESIGN.md)) also covers the parts
+still planned; this page shows only what exists.
 
 ![MailFlow as built](images/as-built.png)
 
@@ -29,15 +29,26 @@ Telegram alert for every P1. Lesson 2.
 
 ![Process email](images/workflows/process-email.png)
 
-## Pages
+## The web app
 
-All behind the `MailFlow page login` (browser login pop-up). Lessons 5 and 6.
+`https://mailflow.22112002.xyz`, code in [`app/`](../app/). One container (`mailflow`) on `ai`,
+published to the internet through srv1 (Cloudflare tunnel and Caddy), one login per person. It
+reads and updates the `MailFlow emails` table through n8n's API and sends Gmail replies through
+`MailFlow · Reply`. Run, deploy and account commands: [app/README.md](../app/README.md).
+
+![Reply](images/workflows/reply.png)
+
+`MailFlow · Reply` takes the header `X-MailFlow-Secret` (credential `MailFlow app secret`) and
+answers `{"result": "sent" | "cannot" | "not_found"}`.
+
+## The first pages (n8n, switched off after the app went live)
+
+Kept in n8n, inactive, for rollback. They used the `MailFlow page login` (browser login pop-up).
+Lessons 5 and 6.
 
 ![Inbox page](images/workflows/inbox-page.png)
 
 ![Email page and status](images/workflows/email-page.png)
-
-![Reply](images/workflows/reply.png)
 
 ## Where the workflows are kept
 
