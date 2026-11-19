@@ -87,6 +87,17 @@ def create_app(settings: config.Settings, engine: Engine, store: Store, clock=ti
             return request.headers.get("cf-connecting-ip", peer)
         return peer
 
+    def _plain_http(request: Request) -> RedirectResponse | None:
+        # Cloudflare also serves http://; the session cookie is https-only, so a login there would
+        # silently fail. Cf-Visitor (set by Cloudflare) says which scheme the visitor used.
+        peer = request.client.host if request.client else ""
+        if not (settings.trusted_proxy and peer == settings.trusted_proxy):
+            return None
+        if '"scheme":"http"' not in request.headers.get("cf-visitor", "").replace(" ", ""):
+            return None
+        target = settings.site_origin + request.url.path + (f"?{request.url.query}" if request.url.query else "")
+        return RedirectResponse(target, 308)
+
     def _refusal(request: Request) -> JSONResponse | None:
         if request.method not in CHANGE_METHODS:
             return None
@@ -107,7 +118,7 @@ def create_app(settings: config.Settings, engine: Engine, store: Store, clock=ti
 
     @app.middleware("http")
     async def guard(request: Request, call_next):
-        response = _refusal(request) or await call_next(request)
+        response = _plain_http(request) or _refusal(request) or await call_next(request)
         response.headers["Content-Security-Policy"] = CSP
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"

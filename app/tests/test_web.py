@@ -265,6 +265,17 @@ def test_trusted_proxy_must_be_set_and_none_opts_out(monkeypatch):
     assert config.from_env().trusted_proxy == "10.0.0.20"
 
 
+def test_plain_http_through_cloudflare_redirects_to_https(world):
+    client, _, _ = world
+    proxied = TestClient(client.app, base_url=ORIGIN, client=("10.0.0.20", 443))
+    response = proxied.get("/login?x=1", headers={"Cf-Visitor": '{"scheme":"http"}'}, follow_redirects=False)
+    assert response.status_code == 308
+    assert response.headers["location"] == ORIGIN + "/login?x=1"
+    assert proxied.get("/login", headers={"Cf-Visitor": '{"scheme":"https"}'}).status_code == 200
+    # Only srv1 is believed: the same header from anywhere else changes nothing.
+    assert client.get("/login", headers={"Cf-Visitor": '{"scheme":"http"}'}, follow_redirects=False).status_code == 200
+
+
 def test_security_headers_on_every_response(world):
     client, _, _ = world
     for path in ("/login", "/api/inbox"):
