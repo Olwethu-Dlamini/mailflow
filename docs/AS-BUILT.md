@@ -23,9 +23,10 @@ email. Both read only mail from 16 November on and leave emails unread.
 
 ## Process email
 
-Skips empty runs and emails already saved, sorts newsletters and no-reply mail with rules, asks
-Mistral for type, priority, mood, needs reply, summary and next step, saves the row and sends a
-Telegram alert for every P1. Lesson 2.
+Skips empty runs and emails already saved, sorts newsletters, no-reply and event-platform mail
+(Devpost, Eventbrite, Luma, MLH) with rules, asks Mistral for the hackathon topic, priority, sender,
+needs reply, summary and next step (design §2.3a), saves the row and sends a Telegram alert for
+every P1. Lesson 2.
 
 ![Process email](images/workflows/process-email.png)
 

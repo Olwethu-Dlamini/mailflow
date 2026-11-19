@@ -1,8 +1,9 @@
 # MailFlow system design
 
-MailFlow brings every company mailbox into one place, sorts each email for
-customer service (what it is, how soon to answer, the sender's mood, whether it needs a reply,
-what to do next), and shows them all on one web page as a queue. It is built entirely in **n8n** on the company's own server
+MailFlow brings every mailbox into one place, sorts each email for the people who answer it
+(what it is about, who sent it, how soon to answer, whether it needs a reply, what to do next), and
+shows them all on one web page as a queue. Since 2026-11-19 the labels are for a **hackathon
+organiser** (§2.3a, decision M12); they started as customer-service labels. It is built in **n8n** on the company's own server
 (`ai`), with the AI running on that server too, so no email has to leave the company.
 
 This repo is **public**. It holds the design, the lessons and the deck: never commit mailbox
@@ -20,13 +21,13 @@ unnoticed in a mailbox nobody opened that day.
 **First version (v1) does exactly this:**
 
 1. Collect every new email from every connected mailbox, whatever the provider.
-2. Give each one a **type** (Complaint, Question, Request, Order, Payment, Technical,
-   Cancellation, Feedback, Marketing, Notification, Other), a **priority** (**P1** answer today,
-   **P2** this week, **P3** no rush or no answer), a **mood** (Angry, Frustrated, Neutral, Happy),
-   **needs a reply** yes/no, a one-line **summary** and a **next step** for staff.
+2. Give each one a **topic** (stored in the `type` column), a **priority** (**P1** answer today,
+   **P2** this week, **P3** no rush or no answer), the **sender** (who is writing),
+   **needs a reply** yes/no, a one-line **summary** and a **next step**. The hackathon topics
+   and senders are in §2.3a; until 2026-11-19 these were customer-service types and a **mood**.
 3. Show all of them on **one web page** as a work queue: by default what needs a reply, P1 first
    and oldest first, with views (Needs reply, P1, Waiting on customer, Done, Everything), filters
-   by mailbox, type and mood, and a "waiting X h" label that turns red when an email is late.
+   by mailbox, topic and sender, and a "waiting X h" label that turns red when an email is late.
 4. Track each email's **status**: `open` → `waiting` (replied, waiting on the customer) →
    `done`; **Reopen** sets it back to `open`.
 5. Send a **Telegram alert** for every **P1** email.
@@ -133,9 +134,45 @@ fields above). Then:
    Next: next step
    ```
 
-The types are a starting set; change the `enum` list (and `TYPES` in the inbox page code) to the
-company's own. Keep them distinct: the model is more accurate with clear, well-described choices.
-The descriptions in the schema are the model's instructions, so P1/P2/P3 are defined there.
+The schema above is the **first, customer-service version** (2026-11-16). It was replaced on
+2026-11-19 by the hackathon scheme in §2.3a; the steps around it are unchanged.
+
+### 2.3a The hackathon scheme (since 2026-11-19, decision M12)
+
+| Field | Values |
+|---|---|
+| `type` = **topic** | Registration · Team · Rules & judging · Submission · Sponsorship · Mentor/Judge · Volunteer · Logistics (venue, power, WiFi, travel, food, visa letters, accessibility) · Prizes & payouts · Media/press · Withdrawal · Code of conduct · Platform notification · Marketing · Other |
+| `sender` | Participant · Sponsor · Mentor/Judge · Volunteer · Vendor/Venue · Press · Organiser · Automated · Other |
+| `priority` | **P1** today: code of conduct or safety, a problem during the event, a submission problem near the deadline, sponsor commitments, payments or prize money. **P2** this week: normal questions, registrations, teams, logistics, mentors, volunteers, press. **P3**: no answer needed |
+| `needs_reply`, `summary`, `next_step` | as before |
+
+**Where it lives.** The topic, sender and priority rules are in the `Sort with AI` node's
+**System Prompt Template** (*Options*), one line per topic, ending with the exact form of the
+answer. The JSON Schema keeps the six fields and the allowed values (`enum`); its descriptions
+point to the instructions. Mistral 7B ignored a single long description inside the schema (it
+put 10 of 15 test emails under the first topic, Registration), and without the answer form at
+the end it answered with a copy of the schema ("Model output doesn't fit required format").
+
+**Rules before the AI.** `Obvious mail?` also catches senders containing `devpost.com`,
+`eventbrite.`, `luma` or `mlh.io`. `Rule tags` sets topic *Platform notification* (event
+platforms and no-reply senders) or *Marketing* (newsletters), sender *Automated*, P3.
+
+**Measured on `ai`, 2026-11-19** (`mistral:latest`, temperature 0, sent through `MailFlow ·
+Process email` one at a time): 16 made-up hackathon emails, one or more per topic and sender.
+
+| Instructions | Topic right | Sender right | Priority right | Time per email |
+|---|---|---|---|---|
+| Long description inside the schema | 4 of 15 (10 said *Registration*) | 14 of 15 | 13 of 15 | ~32 s |
+| System prompt, one line per topic, answer form | 15 of 16, then 16 of 16 after separating *Sponsorship* (gives) from *Marketing* (sells) | 16 of 16 | 15 of 16 | ~30 s (one email 100 s) |
+
+The one priority miss: a withdrawal for a family emergency came out P1 where P2 was expected. The
+Devpost notification was caught by the rules in 6 s. A run with several emails at once saved one
+email twice and lost another, because `Already saved?` and the insert are not one step; collectors
+send one email at a time, so this does not happen in normal use.
+
+**The page** ([`app/`](../app/)) filters by Topic and Sender; `TOPICS` and `SENDERS` in
+`app/src/mailflow/queue.py` must equal the `enum` lists. *Code of conduct* is shown in red.
+The Telegram P1 alert names the topic and the sender.
 
 ### 2.4 The pages
 
@@ -219,9 +256,10 @@ number, boolean, date.
 | `subject` | string | collector |
 | `received_at` | date | collector |
 | `body` | string | collector (max 4,000 characters) |
-| `type` | string | rules or AI |
+| `type` | string | rules or AI: the hackathon **topic** (§2.3a); older rows hold customer-service types |
 | `priority` | string | rules or AI (`P1`, `P2`, `P3`) |
-| `mood` | string | rules or AI |
+| `sender` | string | rules or AI (since 2026-11-19): Participant, Sponsor, Mentor/Judge, Volunteer, Vendor/Venue, Press, Organiser, Automated, Other |
+| `mood` | string | until 2026-11-19 only (customer-service scheme); no longer filled |
 | `needs_reply` | boolean | rules or AI |
 | `summary` | string | rules or AI |
 | `next_step` | string | rules or AI |
@@ -361,6 +399,7 @@ MailFlow, raise it to `30m` in `/opt/automation/.env`: Mistral then holds about 
 | M9 | **Customer-service fields** (type, P1-P3 priority, mood, needs a reply, next step) and statuses open → waiting → done (2026-11-16) | Category + sentiment + urgency (Positive/Negative sorting) | Tells staff what to do and what to answer first, instead of only describing the email; one shared queue for now (per-person assignment later, §9) |
 | M10 | Replies from the page through the **Gmail node** (Gmail mailbox only, 2026-11-16) | n8n Send Email node; extending the DDOService bridge | The owner's choice for now; the Gmail node threads replies and files them in Sent, Send Email cannot set `In-Reply-To`. Costs a Google Cloud project and n8n on https |
 | M11 | The page as a **separate web app** (FastAPI, plain HTML/JS, one container on `ai`) at `mailflow.22112002.xyz`, **one account per person** (2026-11-19) | Keep n8n Webhook + HTML pages with Basic Auth (M7); a shared login; Google sign-in; Tailscale identity | The owner wants a real site, public on the company domain, with n8n as the engine. Per-person accounts allow "who did what" and assignment later. FastAPI like ollagi, ~60 MB of the VM's memory; n8n keeps every mailbox login and the AI |
+| M12 | **Hackathon-organiser labels** (2026-11-19): topic (15 hackathon topics), sender (who is writing) instead of mood, P1-P3 rules for an event; replaced everywhere, old rows re-sorted | Keep customer service; per-mailbox schemes; mood and sender both | The owner's use case is a hackathon organiser: who is writing and what about decides the answer, mood did not. Sender keeps the AI at six fields, so the speed stays the same. Platform mail (Devpost, Eventbrite, Luma, MLH) is caught by rules |
 
 ## 12. Risks
 

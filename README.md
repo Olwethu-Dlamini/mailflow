@@ -1,7 +1,7 @@
 # MailFlow
 
-All company mailboxes in one place, each email sorted for customer service (**type**, **priority**,
-**mood**, whether it **needs a reply** and the **next step**), worked by staff on one web page,
+All mailboxes in one place, each email sorted for a hackathon organiser (**topic**, **sender**,
+**priority**, whether it **needs a reply** and the **next step**), worked by the team on one web page,
 `https://mailflow.22112002.xyz`, each with their own login. **n8n** is the engine (collects, sorts
 with the AI on the company's own server, sends replies); the page is a small web app in [`app/`](app/).
 
