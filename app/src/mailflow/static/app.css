@@ -40,6 +40,7 @@ button { font: inherit; }
 .topbar .spacer { flex: 1; }
 .topbar .btn { font-size: 14px; padding: 4px 10px; }
 .p1-pill { background: var(--red); padding: 2px 8px; border-radius: 10px; font-size: 13px; }
+.topbar .meta.stale { opacity: 1; background: #fff8c5; color: #7d4e00; padding: 2px 8px; border-radius: 10px; }
 
 /* three panes */
 .panes { flex: 1; display: grid; grid-template-columns: 220px minmax(320px, 420px) 1fr; min-height: 0; }

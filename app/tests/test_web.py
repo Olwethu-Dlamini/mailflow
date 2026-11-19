@@ -39,7 +39,7 @@ class FakeEngine:
         if self.down:
             raise EngineDown("n8n unreachable")
 
-    async def recent_rows(self, days=30):
+    async def recent_rows(self):
         self._check()
         return ROWS
 
@@ -225,6 +225,44 @@ def test_behind_the_trusted_proxy_each_visitor_counts_on_their_own(world):
     other = proxied.post("/api/login", json={"email": "staff@example.com", "password": PASSWORD},
                          headers={**H, "Cf-Connecting-IP": "7.7.7.7"})
     assert other.status_code == 200
+
+
+def test_wrong_current_passwords_count_toward_the_lockout(world):
+    client, _, _ = world
+    login(client)
+    for i in range(5):
+        response = client.post("/api/me/password", json={"current": f"guess number {i}", "new": "another long password"}, headers=H)
+        assert response.status_code == 400
+    sixth = client.post("/api/me/password", json={"current": PASSWORD, "new": "another long password"}, headers=H)
+    assert sixth.status_code == 400
+    assert "15 minutes" in sixth.json()["error"]
+    client.post("/api/logout", headers=H)
+    assert client.post("/api/login", json={"email": "staff@example.com", "password": PASSWORD}, headers=H).status_code == 401
+
+
+def test_large_or_chunked_bodies_are_refused_before_reading(world):
+    client, engine, _ = world
+    login(client)
+    big = "x" * (64 * 1024 + 1)
+    assert client.post("/api/login", content=big, headers={**H, "Content-Type": "application/json"}).status_code == 413
+    chunked = client.post("/api/emails/1/reply", content=iter([b'{"text": "hi"}']), headers={**H, "Content-Type": "application/json"})
+    assert chunked.status_code == 411
+    assert engine.replies == []
+    assert client.post("/api/emails/1/reply", json={"text": "fine size"}, headers=H).status_code == 200
+
+
+def test_trusted_proxy_must_be_set_and_none_opts_out(monkeypatch):
+    from mailflow import config
+
+    for name, value in {"N8N_API_KEY": "k", "MAILFLOW_TABLE_ID": "t", "N8N_REPLY_SECRET": "s", "SITE_ORIGIN": ORIGIN}.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("TRUSTED_PROXY", raising=False)
+    with pytest.raises(SystemExit):
+        config.from_env()
+    monkeypatch.setenv("TRUSTED_PROXY", "none")
+    assert config.from_env().trusted_proxy == ""
+    monkeypatch.setenv("TRUSTED_PROXY", "10.0.0.20")
+    assert config.from_env().trusted_proxy == "10.0.0.20"
 
 
 def test_security_headers_on_every_response(world):

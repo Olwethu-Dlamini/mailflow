@@ -34,6 +34,8 @@ def from_env() -> Settings:
         reply_secret=_need("N8N_REPLY_SECRET"),
         db_path=os.environ.get("DB_PATH", "/data/mailflow.db"),
         cookie_secure=os.environ.get("COOKIE_SECURE", "true").lower() != "false",
-        trusted_proxy=os.environ.get("TRUSTED_PROXY", "").strip(),
+        # Required: unset, every visitor would share srv1's address and 20 bad logins would lock
+        # everyone out. "none" (laptop testing, no proxy) uses each connection's own address.
+        trusted_proxy="" if _need("TRUSTED_PROXY").lower() == "none" else _need("TRUSTED_PROXY"),
         site_origin=_need("SITE_ORIGIN").rstrip("/"),
     )

@@ -1,6 +1,7 @@
 # MailFlow web app on `ai`, next to the automation stack (DDOService, /opt/automation).
 # It joins that stack's network so it reaches n8n as http://n8n:5678; n8n's own port is not needed.
-# Published on 3100 for srv1's Caddy (mailflow.22112002.xyz); secrets come from .env (see .env.example).
+# Published only on ai's LAN address (10.0.0.31:3100) for srv1's Caddy (mailflow.22112002.xyz),
+# so it is not reachable around Cloudflare from the tailnet. Secrets come from .env (see .env.example).
 
 services:
   mailflow:
@@ -9,11 +10,18 @@ services:
     container_name: mailflow
     env_file: .env
     ports:
-      - "${MAILFLOW_PORT:-3100}:8000"
+      - "${MAILFLOW_BIND:-10.0.0.31}:${MAILFLOW_PORT:-3100}:8000"
     volumes:
       - mailflow_data:/data
     networks:
       - automation
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     cpus: 0.5
     mem_limit: 128m
     restart: unless-stopped

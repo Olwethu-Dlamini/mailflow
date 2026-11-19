@@ -67,26 +67,44 @@ def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def _check_not_locked(store: Store, email_key: str, ip_key: str, now: float) -> None:
+    since = now - LOCK_SECONDS
+    if store.failures_since(email_key, since) >= LOCK_AFTER or store.failures_since(ip_key, since) >= IP_LIMIT:
+        raise LoginRefused(LOCKED)
+
+
+def _fail(store: Store, email_key: str, ip_key: str, now: float) -> None:
+    store.add_failure(email_key, now)
+    store.add_failure(ip_key, now)
+
+
 def login(store: Store, email: str, password: str, client_ip: str, now: float) -> tuple[str, User]:
     """Returns (session token, user) or raises LoginRefused."""
     email = normal_email(email)
     email_key, ip_key = f"email:{email}", f"ip:{client_ip}"
-    since = now - LOCK_SECONDS
     store.prune(failures_before=now - 24 * 3600, sessions_before=now - MAX_SECONDS)
-    if store.failures_since(email_key, since) >= LOCK_AFTER or store.failures_since(ip_key, since) >= IP_LIMIT:
-        raise LoginRefused(LOCKED)
+    _check_not_locked(store, email_key, ip_key, now)
 
     user = store.user_by_email(email)
     ok = verify_password(password, user.pw_hash if user else _DUMMY_HASH)
     if not (user and ok and user.active):
-        store.add_failure(email_key, now)
-        store.add_failure(ip_key, now)
+        _fail(store, email_key, ip_key, now)
         raise LoginRefused(REFUSED)
 
     store.forget_failures(email_key)
     token = secrets.token_urlsafe(32)
     store.add_session(_token_hash(token), user.id, now)
     return token, user
+
+
+def check_current_password(store: Store, user: User, password: str, client_ip: str, now: float) -> None:
+    """Before a password change. Wrong guesses count toward the same lockout as logins, so a
+    left-open session cannot be used to try passwords without limit."""
+    email_key, ip_key = f"email:{user.email}", f"ip:{client_ip}"
+    _check_not_locked(store, email_key, ip_key, now)
+    if not verify_password(password, user.pw_hash):
+        _fail(store, email_key, ip_key, now)
+        raise LoginRefused("The current password is wrong.")
 
 
 def session_user(store: Store, token: str, now: float) -> User | None:

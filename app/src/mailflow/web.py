@@ -24,6 +24,7 @@ STATIC = Path(__file__).parent / "static"
 COOKIE = "mf_session"
 REPLY_MAILBOXES = ["gmail"]  # MailFlow · Reply sends through the Gmail node only
 MAX_REPLY = 20_000
+MAX_BODY = 64 * 1024  # bytes; a reply is at most MAX_REPLY characters
 CSP = (
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
     "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'"
@@ -86,16 +87,27 @@ def create_app(settings: config.Settings, engine: Engine, store: Store, clock=ti
             return request.headers.get("cf-connecting-ip", peer)
         return peer
 
+    def _refusal(request: Request) -> JSONResponse | None:
+        if request.method not in CHANGE_METHODS:
+            return None
+        origin = request.headers.get("origin")
+        if request.headers.get("x-mailflow") != "1" or (origin and origin != settings.site_origin):
+            return JSONResponse({"error": "Refused: this change did not come from the MailFlow page."}, 403)
+        # The whole body is read into memory before it is checked, so cap it up front
+        # (the container has 128 MB). A browser always sends Content-Length for these requests.
+        if "chunked" in request.headers.get("transfer-encoding", "").lower():
+            return JSONResponse({"error": "Content-Length required."}, 411)
+        try:
+            length = int(request.headers.get("content-length", "0"))
+        except ValueError:
+            length = MAX_BODY + 1
+        if length > MAX_BODY:
+            return JSONResponse({"error": "Request too large."}, 413)
+        return None
+
     @app.middleware("http")
     async def guard(request: Request, call_next):
-        if request.method in CHANGE_METHODS:
-            origin = request.headers.get("origin")
-            if request.headers.get("x-mailflow") != "1" or (origin and origin != settings.site_origin):
-                response = JSONResponse({"error": "Refused: this change did not come from the MailFlow page."}, 403)
-            else:
-                response = await call_next(request)
-        else:
-            response = await call_next(request)
+        response = _refusal(request) or await call_next(request)
         response.headers["Content-Security-Policy"] = CSP
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "same-origin"
@@ -170,9 +182,11 @@ def create_app(settings: config.Settings, engine: Engine, store: Store, clock=ti
         return _user_json(user)
 
     @app.post("/api/me/password")
-    def change_password(body: NewPassword, user: User = Depends(current_user)):
-        if not auth.verify_password(body.current, user.pw_hash):
-            raise ApiError(400, "The current password is wrong.")
+    def change_password(body: NewPassword, request: Request, user: User = Depends(current_user)):
+        try:
+            auth.check_current_password(store, user, body.current, client_ip(request), clock())
+        except auth.LoginRefused as refused:
+            raise ApiError(400, str(refused)) from None
         try:
             auth.check_password_rule(body.new)
         except ValueError as error:

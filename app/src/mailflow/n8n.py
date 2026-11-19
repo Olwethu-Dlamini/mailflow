@@ -16,6 +16,7 @@ from .config import Settings
 log = logging.getLogger(__name__)
 
 PAGE = 250  # the n8n API's maximum page size
+DAYS = 30  # the queue shows the last 30 days, like the n8n Inbox page did
 ROW_CAP = 3000  # most rows read for one list; ~4.5 KB each, so ~13 MB at worst
 CACHE_SECONDS = 15
 STATUSES = ("open", "waiting", "done")
@@ -58,11 +59,11 @@ class Engine:
             raise EngineDown(f"n8n answered {response.status_code} for {method} {httpx.URL(url).path}")
         return response
 
-    async def recent_rows(self, days: int = 30) -> list[dict]:
-        """Rows received in the last `days` days, newest first; cached for CACHE_SECONDS."""
+    async def recent_rows(self) -> list[dict]:
+        """Rows received in the last DAYS days, newest first; cached for CACHE_SECONDS."""
         if self._cache and self._clock() - self._cache[0] < CACHE_SECONDS:
             return self._cache[1]
-        since = (self._now() - timedelta(days=days)).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        since = (self._now() - timedelta(days=DAYS)).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         params = {"limit": str(PAGE), "sortBy": "received_at:desc", "filter": _filter("received_at", "gte", since)}
         rows: list[dict] = []
         while True:
@@ -73,7 +74,7 @@ class Engine:
                 break
             params["cursor"] = cursor
         if len(rows) >= ROW_CAP:
-            log.warning("row cap %d reached: older emails in the last %d days are not listed", ROW_CAP, days)
+            log.warning("row cap %d reached: older emails in the last %d days are not listed", ROW_CAP, DAYS)
             rows = rows[:ROW_CAP]
         self._cache = (self._clock(), rows)
         return rows
@@ -85,8 +86,9 @@ class Engine:
         return data[0] if data else None
 
     async def set_status(self, row_id: int, to: str) -> None:
-        status = to if to in STATUSES else "open"
-        payload = {"filter": json.loads(_filter("id", "eq", row_id)), "data": {"status": status}}
+        if to not in STATUSES:
+            raise ValueError(f"unknown status {to!r}")
+        payload = {"filter": json.loads(_filter("id", "eq", row_id)), "data": {"status": to}}
         await self._call("PATCH", f"{self._rows_url}/update", json=payload, headers=self._headers)
         self._cache = None
 

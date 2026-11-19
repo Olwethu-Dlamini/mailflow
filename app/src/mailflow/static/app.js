@@ -289,7 +289,22 @@ function renderTop() {
   const p1 = $("p1-count");
   p1.hidden = !inbox.counts.p1;
   p1.textContent = `${inbox.counts.p1} × P1`;
-  $("total").textContent = `${inbox.total} emails · last 30 days`;
+  const total = $("total");
+  total.classList.remove("stale");
+  total.textContent = `${inbox.total} emails · last 30 days`;
+}
+
+let loadedAt = null;
+// The 60-second refresh must not fail silently: say since when the list is old, and why.
+async function backgroundRefresh() {
+  if (document.hidden) return;
+  try {
+    await loadInbox();
+  } catch (error) {
+    const total = $("total");
+    total.classList.add("stale");
+    total.textContent = `⚠ not refreshed since ${loadedAt ? showTime(loadedAt, listTime) : "opening"}: ${error.message}`;
+  }
 }
 
 // Each load gets a number; an answer that arrives after a newer load started is dropped, so a
@@ -302,6 +317,7 @@ async function loadInbox() {
   const data = await api(`/api/inbox?${q}`);
   if (token !== inboxToken) return;
   inbox = data;
+  loadedAt = new Date();
   renderTop();
   renderSidebar();
   renderList();
@@ -426,6 +442,6 @@ $("refresh").addEventListener("click", render);
   $("me").textContent = me.name;
   $("open-users").hidden = !me.is_admin;
   await render();
-  setInterval(() => { if (!document.hidden) loadInbox().catch(() => {}); }, REFRESH_MS);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) loadInbox().catch(() => {}); });
+  setInterval(backgroundRefresh, REFRESH_MS);
+  document.addEventListener("visibilitychange", backgroundRefresh);
 })();

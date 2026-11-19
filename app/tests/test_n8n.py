@@ -84,20 +84,23 @@ async def test_recent_rows_are_cached_for_15_seconds_and_a_status_change_clears_
     assert lists == 3
 
 
-async def test_set_status_sends_open_for_an_unknown_status_and_filters_by_row_id():
+async def test_set_status_filters_by_row_id_and_refuses_an_unknown_status():
     sent = []
 
     def handler(request):
         sent.append(request)
         return httpx.Response(200, json=True)
 
-    await engine(handler).set_status(7, "bogus")
+    with pytest.raises(ValueError):
+        await engine(handler).set_status(7, "bogus")
+    assert sent == []
+    await engine(handler).set_status(7, "waiting")
     request = sent[0]
     assert request.method == "PATCH"
     assert request.url.path == ROWS + "/update"
     assert json.loads(request.content) == {
         "filter": {"type": "and", "filters": [{"columnName": "id", "condition": "eq", "value": 7}]},
-        "data": {"status": "open"},
+        "data": {"status": "waiting"},
     }
 
 
