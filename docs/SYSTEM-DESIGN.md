@@ -143,8 +143,8 @@ The descriptions in the schema are the model's instructions, so P1/P2/P3 are def
 `https://mailflow.22112002.xyz`: one account per person, the same views, filters, sorting, late
 rule, status buttons and Gmail reply as below, in three panes (views and filters, the queue, the
 open email). It reads and updates the data table through n8n's API and calls `MailFlow · Reply`
-with a secret header. The n8n page workflows below were the first version; they are switched off
-once the app is live and kept for rollback.
+with a secret header. The n8n page workflows below were the first version; they were switched off
+on 2026-11-19 when the app went live, and are kept in n8n for rollback.
 
 The first version: both pages are n8n workflows that start with a **Webhook** node (method GET,
 authentication **Basic Auth**) and end with **Respond to Webhook** returning HTML.
