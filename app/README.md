@@ -40,26 +40,38 @@ uv run pytest
 
 ## Deploy on `ai`
 
+First stage the settings as `~/mailflow.env` on `ai` (mode 600, values as in `.env.example`;
+`TRUSTED_PROXY=10.0.0.10`, srv1's LAN address). Then, on `ai`:
+
 ```bash
-sudo git clone https://github.com/Olwethu-Dlamini/mailflow.git /opt/mailflow
-cd /opt/mailflow/app
-sudo install -m 600 .env.example .env && sudo nano .env    # every value; TRUSTED_PROXY is srv1's LAN address
-sudo docker compose up -d --build
-sudo docker compose exec mailflow mailflow user add --email you@example.com --name You --admin
+wget -qO /tmp/ai-deploy.sh https://raw.githubusercontent.com/Olwethu-Dlamini/mailflow/main/app/deploy/ai-deploy.sh
+sudo bash /tmp/ai-deploy.sh
 ```
+
+[`deploy/ai-deploy.sh`](deploy/ai-deploy.sh) clones (or pulls) the repo into `/opt/mailflow`,
+moves the settings to `/opt/mailflow/app/.env` (root, 600), builds and starts the container, waits
+for it to be healthy and, when there are no accounts yet, asks for your admin account.
 
 The port is published on ai's LAN address only (`10.0.0.31:3100`, change with `MAILFLOW_BIND`),
 so the app is reached through srv1 and Cloudflare, not around them. The container runs read-only,
 without Linux capabilities, as a non-root user, in 128 MB.
 
-Update later: `cd /opt/mailflow && sudo git pull && cd app && sudo docker compose up -d --build`.
+Update later: run the same script again.
 
 Accounts from the server: `sudo docker compose exec mailflow mailflow user list|reset|disable|enable --email …`.
 
 ## Publish through srv1
 
-Same path as `n8n.22112002.xyz` (Homelab repo, `n8n-public-webhooks.md`): DNS route, a tunnel
-ingress line above the 404 catch-all, and a Caddy block:
+Same path as `n8n.22112002.xyz` (Homelab repo, `n8n-public-webhooks.md`). On srv1:
+
+```bash
+wget -qO /tmp/srv1-publish.sh https://raw.githubusercontent.com/Olwethu-Dlamini/mailflow/main/app/deploy/srv1-publish.sh
+sudo bash /tmp/srv1-publish.sh
+```
+
+[`deploy/srv1-publish.sh`](deploy/srv1-publish.sh) backs up both configs, adds the tunnel ingress
+line above the 404 catch-all and this Caddy block, validates both (and restores the backups if
+either fails), adds the DNS record, then reloads Caddy and restarts the tunnel:
 
 ```caddyfile
 mailflow.22112002.xyz:80 {
