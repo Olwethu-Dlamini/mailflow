@@ -193,7 +193,7 @@ function renderList() {
         item.needs_reply && item.status !== "done" && item.next_step ? el("span", { class: "next", text: item.next_step }) : null,
         el("span", { class: "chips" },
           el("span", { class: `chip topic ${TOPIC_CLASS[item.type] || ""}`.trim(), text: item.type || "" }),
-          item.sender ? el("span", { class: "chip sender", text: item.sender }) : null,
+          item.sender ? el("span", { class: "chip role", text: item.sender }) : null,
           el("span", { class: "chip box", text: item.mailbox || "" }),
           item.status !== "open" ? el("span", { class: `chip st ${item.status}`, text: STATUS_TEXT[item.status] || item.status }) : null,
           item.waiting ? el("span", { class: item.late ? "age late" : "age", text: `waiting ${item.waiting}` }) : null)));
@@ -249,7 +249,7 @@ async function renderDetail() {
       el("div", { class: "chips" },
         el("span", { class: `prio ${email.priority || ""}`, text: email.priority || "–" }),
         el("span", { class: `chip topic ${TOPIC_CLASS[email.type] || ""}`.trim(), text: email.type || "" }),
-        email.sender ? el("span", { class: "chip sender", text: `From a ${email.sender.toLowerCase()}` }) : null,
+        email.sender ? el("span", { class: "chip role", text: email.sender }) : null,
         el("span", { class: "chip", text: email.needs_reply ? "Needs a reply" : "No reply needed" }))),
     (email.body || "").trim() ? el("div", { class: "body", text: email.body }) : null,
     replyBox(email, keepDraft),
