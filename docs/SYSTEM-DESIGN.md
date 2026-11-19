@@ -170,6 +170,13 @@ Devpost notification was caught by the rules in 6 s. A run with several emails a
 email twice and lost another, because `Already saved?` and the insert are not one step; collectors
 send one email at a time, so this does not happen in normal use.
 
+**No email is lost when the AI's answer is unusable.** Mistral sometimes breaks the form (in the
+re-sort it put a sender, "Vendor/Venue", into the topic), and n8n then rejects the answer. Until
+2026-11-19 that stopped the run and the email was never saved. Now `Sort with AI` has *On Error:
+Continue*, and `AI tags` falls back to topic *Other*, sender *Other*, P2, needs a reply, next step
+"Sort this email by hand", `sorted_by` = `unsorted`; the page says "Not sorted" on such emails.
+Tested by feeding that same email again: saved as unsorted, and a normal email still sorted.
+
 **The page** ([`app/`](../app/)) filters by Topic and Sender; `TOPICS` and `SENDERS` in
 `app/src/mailflow/queue.py` must equal the `enum` lists. *Code of conduct* is shown in red.
 The Telegram P1 alert names the topic and the sender.

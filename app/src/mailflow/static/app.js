@@ -12,6 +12,11 @@ const VIEWS = [
 const STATUS_TEXT = { open: "Open", waiting: "Waiting on customer", done: "Done" };
 // Topics that must stand out wherever they appear.
 const TOPIC_CLASS = { "Code of conduct": "alert" };
+const SORTED_BY = {
+  ai: "Sorted by AI",
+  rule: "Sorted by a rule",
+  unsorted: "Not sorted: the AI's answer was unusable, so the labels below are placeholders",
+};
 const BUTTONS = {
   open: [["waiting", "Replied · waiting on customer", "wait"], ["done", "Done", "done"]],
   waiting: [["done", "Done", "done"], ["open", "Reopen", ""]],
@@ -238,7 +243,7 @@ async function renderDetail() {
           email.from_name ? el("span", { class: "muted", text: ` <${email.from_address || ""}>` }) : null),
         el("div", { class: "muted small", text: `to ${email.mailbox || ""} · ${showTime(email.received_at, fullTime)}` }))),
     el("section", { class: "ai" },
-      el("div", { class: "ai-label", text: email.sorted_by === "rule" ? "Sorted by a rule" : "Sorted by AI" }),
+      el("div", { class: "ai-label", text: SORTED_BY[email.sorted_by] || SORTED_BY.ai }),
       el("p", { class: "summary", text: email.summary || "" }),
       email.needs_reply ? el("p", { class: "next", text: email.next_step || "" }) : null,
       el("div", { class: "chips" },
