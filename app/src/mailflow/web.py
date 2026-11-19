@@ -127,6 +127,9 @@ def create_app(settings: config.Settings, engine: Engine, store: Store, clock=ti
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
+        elif request.url.path.startswith("/static/") or request.url.path in ("/", "/login"):
+            # Re-check with the server on every load (a cheap 304), so a deploy reaches everyone at once.
+            response.headers["Cache-Control"] = "no-cache"
         return response
 
     @app.exception_handler(ApiError)

@@ -48,6 +48,15 @@ function showTime(value, format) {
   return Number.isNaN(date.getTime()) ? "" : format.format(date);
 }
 
+// Initials in a soft-coloured circle; the colour follows the name, so a sender keeps theirs.
+function avatar(name, size = "") {
+  const words = String(name || "?").replace(/[<>"@].*$/, "").split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  const initials = (words.length > 1 ? words[0][0] + words[1][0] : (words[0] || "?").slice(0, 2)).toUpperCase();
+  let hash = 0;
+  for (const c of String(name || "")) hash = (hash * 31 + c.charCodeAt(0)) >>> 0;
+  return el("span", { class: `avatar c${hash % 6} ${size}`.trim(), "aria-hidden": "true", text: initials });
+}
+
 class ApiError extends Error {
   constructor(status, message) {
     super(message);
@@ -126,7 +135,8 @@ function filterGroup(title, name, pairs) {
   return [
     el("h3", { text: title }),
     el("ul", {},
-      navLink("All", undefined, !current, () => go({ [name]: "", id: "" })),
+      // "All" is the resting state, so it is not highlighted; only an applied filter is.
+      navLink("All", undefined, false, () => go({ [name]: "", id: "" })),
       pairs.map(([value, count]) => navLink(value, count, current === value, () => go({ [name]: value, id: "" })))),
   ];
 }
@@ -150,11 +160,11 @@ function renderList() {
   const viewLabel = (VIEWS.find(([key]) => key === inbox.view) || VIEWS[0])[1];
   const filters = [s.mailbox, s.type, s.mood].filter(Boolean).join(" · ");
   const header = el("div", { class: "list-head" },
-    el("strong", { text: viewLabel }),
-    filters ? el("span", { class: "muted", text: ` · ${filters}` }) : null,
-    el("span", { class: "muted right", text: `${inbox.items.length}` }));
+    el("span", { class: "list-title", text: viewLabel }),
+    el("span", { class: "count", text: `${inbox.items.length}` }),
+    filters ? el("span", { class: "muted small filters", text: filters }) : null);
   if (!inbox.items.length) {
-    list.replaceChildren(header, el("p", { class: "empty", text: "Nothing here. 🎉" }));
+    list.replaceChildren(header, el("p", { class: "empty", text: "Nothing here." }));
     return;
   }
   const rows = inbox.items.map((item) => {
@@ -165,19 +175,21 @@ function renderList() {
       "aria-current": selected ? "true" : null,
       onclick: () => go({ id: String(item.id) }),
     },
-      el("span", { class: `prio ${item.priority || ""}`, text: item.priority || "–" }),
+      avatar(item.from_name || item.from_address),
       el("span", { class: "item-main" },
         el("span", { class: "item-top" },
           el("span", { class: "from", text: item.from_name || item.from_address || "(unknown sender)" }),
           el("span", { class: "time", text: showTime(item.received_at, listTime) })),
-        el("span", { class: "subject", text: item.subject || "(no subject)" }),
+        el("span", { class: "subject-line" },
+          el("span", { class: `prio ${item.priority || ""}`, text: item.priority || "–" }),
+          el("span", { class: "subject", text: item.subject || "(no subject)" })),
         el("span", { class: "summary", text: item.summary || "" }),
-        item.needs_reply && item.status !== "done" && item.next_step ? el("span", { class: "next", text: `→ ${item.next_step}` }) : null,
+        item.needs_reply && item.status !== "done" && item.next_step ? el("span", { class: "next", text: item.next_step }) : null,
         el("span", { class: "chips" },
           el("span", { class: "chip", text: item.type || "" }),
-          el("span", { class: `chip mood ${MOOD_CLASS[item.mood] || ""}`, text: item.mood || "" }),
+          item.mood && item.mood !== "Neutral" ? el("span", { class: `chip mood ${MOOD_CLASS[item.mood] || ""}`, text: item.mood }) : null,
           el("span", { class: "chip box", text: item.mailbox || "" }),
-          el("span", { class: `chip st ${item.status}`, text: STATUS_TEXT[item.status] || item.status }),
+          item.status !== "open" ? el("span", { class: `chip st ${item.status}`, text: STATUS_TEXT[item.status] || item.status }) : null,
           item.waiting ? el("span", { class: item.late ? "age late" : "age", text: `waiting ${item.waiting}` }) : null)));
   });
   list.replaceChildren(header, ...rows);
@@ -211,25 +223,30 @@ async function renderDetail() {
   const keepDraft = detail.querySelector("textarea")?.value || "";
   detail.replaceChildren(
     backButton(),
-    el("h1", { class: "detail-subject", text: email.subject || "(no subject)" }),
-    el("p", { class: "who" },
-      "From ", el("b", { text: email.from_name || "" }), ` <${email.from_address || ""}>`, el("br"),
-      "To mailbox ", el("b", { text: email.mailbox || "" }), ` · ${showTime(email.received_at, fullTime)} · `,
-      el("span", { class: `chip st ${email.status}`, text: STATUS_TEXT[email.status] || email.status })),
-    el("div", { class: "ai" },
+    el("div", { class: "detail-head" },
+      el("h1", { class: "detail-subject", text: email.subject || "(no subject)" }),
+      el("div", { class: "toolbar" },
+        el("span", { class: `chip st ${email.status}`, text: STATUS_TEXT[email.status] || email.status }),
+        el("span", { class: "spacer" }),
+        (BUTTONS[email.status] || BUTTONS.done).map(([to, label, cls]) =>
+          el("button", { type: "button", class: `btn ${cls}`, onclick: () => setStatus(email.id, to) }, label)))),
+    el("div", { class: "sender" },
+      avatar(email.from_name || email.from_address, "lg"),
+      el("div", { class: "sender-text" },
+        el("div", {}, el("span", { class: "sender-name", text: email.from_name || email.from_address || "" }),
+          email.from_name ? el("span", { class: "muted", text: ` <${email.from_address || ""}>` }) : null),
+        el("div", { class: "muted small", text: `to ${email.mailbox || ""} · ${showTime(email.received_at, fullTime)}` }))),
+    el("section", { class: "ai" },
+      el("div", { class: "ai-label", text: email.sorted_by === "rule" ? "Sorted by a rule" : "Sorted by AI" }),
+      el("p", { class: "summary", text: email.summary || "" }),
+      email.needs_reply ? el("p", { class: "next", text: email.next_step || "" }) : null,
       el("div", { class: "chips" },
         el("span", { class: `prio ${email.priority || ""}`, text: email.priority || "–" }),
         el("span", { class: "chip", text: email.type || "" }),
         el("span", { class: `chip mood ${MOOD_CLASS[email.mood] || ""}`, text: email.mood || "" }),
-        el("span", { class: "chip", text: email.needs_reply ? "needs a reply" : "no reply needed" }),
-        el("span", { class: "muted small", text: `sorted by ${email.sorted_by === "rule" ? "a rule" : "AI"}` })),
-      el("p", { class: "summary", text: email.summary || "" }),
-      email.needs_reply ? el("p", { class: "next", text: `Next step: ${email.next_step || ""}` }) : null),
-    el("div", { class: "body", text: email.body || "" }),
+        el("span", { class: "chip", text: email.needs_reply ? "Needs a reply" : "No reply needed" }))),
+    (email.body || "").trim() ? el("div", { class: "body", text: email.body }) : null,
     replyBox(email, keepDraft),
-    el("div", { class: "actions" },
-      (BUTTONS[email.status] || BUTTONS.done).map(([to, label, cls]) =>
-        el("button", { type: "button", class: `btn ${cls}`, onclick: () => setStatus(email.id, to) }, label))),
   );
 }
 
@@ -440,6 +457,7 @@ $("refresh").addEventListener("click", render);
     return;
   }
   $("me").textContent = me.name;
+  $("me-avatar").replaceWith(avatar(me.name, "sm"));
   $("open-users").hidden = !me.is_admin;
   await render();
   setInterval(backgroundRefresh, REFRESH_MS);
