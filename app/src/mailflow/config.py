@@ -13,7 +13,7 @@ class Settings:
     reply_secret: str  # its Header Auth value, sent as X-MailFlow-Secret
     db_path: str  # SQLite file with accounts and sessions
     cookie_secure: bool  # False only for testing over plain http on the laptop
-    trusted_proxy: str  # srv1's LAN address: only its X-Forwarded-For is believed
+    trusted_proxy: str  # srv1's LAN address: only through it is Cloudflare's Cf-Connecting-IP believed
     site_origin: str  # e.g. https://mailflow.22112002.xyz; POSTs from any other origin are refused
 
 

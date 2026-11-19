@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log in · MailFlow</title>
+<link rel="stylesheet" href="/static/app.css">
+<script src="/static/login.js" defer></script>
+</head>
+<body class="login-page">
+<main class="login-card">
+  <h1 class="brand">MailFlow</h1>
+  <p class="muted">All company mail, sorted for customer service.</p>
+  <form id="login-form" novalidate>
+    <label>Email <input type="email" name="email" autocomplete="username" required autofocus></label>
+    <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
+    <p id="login-error" class="error" role="alert" hidden></p>
+    <button type="submit" class="btn primary">Log in</button>
+  </form>
+</main>
+</body>
+</html>
