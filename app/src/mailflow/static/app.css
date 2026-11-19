@@ -122,9 +122,8 @@ button { font: inherit; color: inherit; }
 .chip.st.open { background: #f2f4f7; color: var(--text-2); }
 .chip.st.waiting { background: var(--blue-soft); color: var(--blue); }
 .chip.st.done { background: var(--green-soft); color: var(--green); }
-.mood.angry { background: var(--red-soft); color: var(--red); }
-.mood.frustrated { background: var(--amber-soft); color: var(--amber); }
-.mood.happy { background: var(--green-soft); color: var(--green); }
+.chip.sender { background: #f4f3ff; color: #5925dc; }
+.chip.topic.alert { background: var(--red-soft); color: var(--red); font-weight: 600; }
 .prio { flex: none; font-size: 11px; font-weight: 700; line-height: 18px; padding: 0 6px; border-radius: 5px; background: #f2f4f7; color: var(--muted); }
 .prio.P1 { background: var(--red-soft); color: var(--red); }
 .prio.P2 { background: var(--amber-soft); color: var(--amber); }

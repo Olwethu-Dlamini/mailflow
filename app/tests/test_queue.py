@@ -10,8 +10,8 @@ def row(id, priority="P2", hours_ago=1.0, status="open", needs_reply=True, **ext
         "id": id,
         "message_id": f"<m{id}@x>",
         "mailbox": "gmail",
-        "type": "Question",
-        "mood": "Neutral",
+        "type": "Registration",
+        "sender": "Participant",
         "priority": priority,
         "needs_reply": needs_reply,
         "status": status,
@@ -81,17 +81,18 @@ def test_unknown_view_falls_back_to_needs_reply():
     assert ids(inbox) == [1]
 
 
-def test_mailbox_type_and_mood_filters_combine():
+def test_mailbox_topic_and_sender_filters_combine():
     rows = [
-        row(1, mailbox="gmail", type="Order", mood="Angry"),
-        row(2, mailbox="22112002", type="Order", mood="Angry"),
-        row(3, mailbox="gmail", type="Question", mood="Angry"),
-        row(4, mailbox="gmail", type="Order", mood="Happy"),
+        row(1, mailbox="gmail", type="Sponsorship", sender="Sponsor"),
+        row(2, mailbox="22112002", type="Sponsorship", sender="Sponsor"),
+        row(3, mailbox="gmail", type="Logistics", sender="Sponsor"),
+        row(4, mailbox="gmail", type="Sponsorship", sender="Organiser"),
     ]
-    assert ids(build(rows, "all", "gmail", "Order", "Angry", NOW)) == [1]
+    assert ids(build(rows, "all", "gmail", "Sponsorship", "Sponsor", NOW)) == [1]
     inbox = build(rows, "all", "gmail", "", "", NOW)
     assert dict(inbox["mailboxes"]) == {"22112002": 1, "gmail": 3}
-    assert dict(inbox["types"]) == {"Question": 1, "Order": 3}
+    assert dict(inbox["topics"]) == {"Sponsorship": 3, "Logistics": 1}
+    assert dict(inbox["senders"]) == {"Sponsor": 3, "Organiser": 1}
 
 
 def test_items_never_carry_the_body():

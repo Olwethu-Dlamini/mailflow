@@ -1,19 +1,23 @@
 """The work queue: views, filters, sorting and the late rule (design §2.4).
 
-Same rules as the n8n Inbox page it replaces; keep TYPES and MOODS equal to the enums in
-MailFlow · Process email.
+Same rules as the n8n Inbox page it replaced. TOPICS and SENDERS must equal the enums in
+MailFlow · Process email (the topic is stored in the `type` column).
 """
 
 from datetime import datetime
 
-TYPES = ["Complaint", "Question", "Request", "Order", "Payment", "Technical", "Cancellation", "Feedback", "Marketing", "Notification", "Other"]
-MOODS = ["Angry", "Frustrated", "Neutral", "Happy"]
+TOPICS = [
+    "Registration", "Team", "Rules & judging", "Submission", "Sponsorship", "Mentor/Judge", "Volunteer",
+    "Logistics", "Prizes & payouts", "Media/press", "Withdrawal", "Code of conduct",
+    "Platform notification", "Marketing", "Other",
+]
+SENDERS = ["Participant", "Sponsor", "Mentor/Judge", "Volunteer", "Vendor/Venue", "Press", "Organiser", "Automated", "Other"]
 VIEWS = ["reply", "p1", "waiting", "done", "all"]
 LATE_AFTER_HOURS = {"P1": 4, "P2": 24}
 PRIORITY_RANK = {"P1": 0, "P2": 1, "P3": 2}
 ITEM_FIELDS = (
     "id", "message_id", "mailbox", "from_name", "from_address", "subject", "summary",
-    "next_step", "type", "priority", "mood", "received_at", "sorted_by",
+    "next_step", "type", "priority", "sender", "received_at", "sorted_by",
 )
 
 
@@ -71,14 +75,14 @@ def _counted(rows: list[dict], key: str, values: list[str]) -> list[list]:
     return [[value, sum(1 for r in rows if r.get(key) == value)] for value in values]
 
 
-def build(rows: list[dict], view: str, mailbox: str, type_: str, mood: str, now: datetime) -> dict:
+def build(rows: list[dict], view: str, mailbox: str, topic: str, sender: str, now: datetime) -> dict:
     view = view if view in IN_VIEW else "reply"
     chosen = [
         r for r in rows
         if IN_VIEW[view](r)
         and (not mailbox or r.get("mailbox") == mailbox)
-        and (not type_ or r.get("type") == type_)
-        and (not mood or r.get("mood") == mood)
+        and (not topic or r.get("type") == topic)
+        and (not sender or r.get("sender") == sender)
     ]
     if view in ("done", "all"):
         chosen.sort(key=_received, reverse=True)
@@ -91,7 +95,7 @@ def build(rows: list[dict], view: str, mailbox: str, type_: str, mood: str, now:
         "counts": {name: sum(1 for r in rows if IN_VIEW[name](r)) for name in VIEWS},
         "total": len(rows),
         "mailboxes": _counted(rows, "mailbox", mailboxes),
-        "types": _counted(rows, "type", [t for t in TYPES if any(r.get("type") == t for r in rows)]),
-        "moods": _counted(rows, "mood", MOODS),
+        "topics": _counted(rows, "type", [t for t in TOPICS if any(r.get("type") == t for r in rows)]),
+        "senders": _counted(rows, "sender", [s for s in SENDERS if any(r.get("sender") == s for r in rows)]),
         "items": [_item(r, stamp) for r in chosen],
     }

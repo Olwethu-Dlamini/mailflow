@@ -10,7 +10,8 @@ const VIEWS = [
   ["all", "Everything"],
 ];
 const STATUS_TEXT = { open: "Open", waiting: "Waiting on customer", done: "Done" };
-const MOOD_CLASS = { Angry: "angry", Frustrated: "frustrated", Neutral: "neutral", Happy: "happy" };
+// Topics that must stand out wherever they appear.
+const TOPIC_CLASS = { "Code of conduct": "alert" };
 const BUTTONS = {
   open: [["waiting", "Replied · waiting on customer", "wait"], ["done", "Done", "done"]],
   waiting: [["done", "Done", "done"], ["open", "Reopen", ""]],
@@ -102,8 +103,8 @@ function state() {
   return {
     view: q.get("view") || "reply",
     mailbox: q.get("mailbox") || "",
-    type: q.get("type") || "",
-    mood: q.get("mood") || "",
+    topic: q.get("topic") || "",
+    sender: q.get("sender") || "",
     id: q.get("id") || "",
   };
 }
@@ -147,8 +148,8 @@ function renderSidebar() {
     el("h3", { text: "Views" }),
     el("ul", {}, VIEWS.map(([key, label]) => navLink(label, inbox.counts[key], inbox.view === key, () => go({ view: key, id: "" })))),
     ...filterGroup("Mailbox", "mailbox", inbox.mailboxes),
-    ...filterGroup("Type", "type", inbox.types),
-    ...filterGroup("Mood", "mood", inbox.moods),
+    ...filterGroup("Topic", "topic", inbox.topics),
+    ...filterGroup("Sender", "sender", inbox.senders),
   );
 }
 
@@ -158,7 +159,7 @@ function renderList() {
   const s = state();
   const list = $("list");
   const viewLabel = (VIEWS.find(([key]) => key === inbox.view) || VIEWS[0])[1];
-  const filters = [s.mailbox, s.type, s.mood].filter(Boolean).join(" · ");
+  const filters = [s.mailbox, s.topic, s.sender].filter(Boolean).join(" · ");
   const header = el("div", { class: "list-head" },
     el("span", { class: "list-title", text: viewLabel }),
     el("span", { class: "count", text: `${inbox.items.length}` }),
@@ -186,8 +187,8 @@ function renderList() {
         el("span", { class: "summary", text: item.summary || "" }),
         item.needs_reply && item.status !== "done" && item.next_step ? el("span", { class: "next", text: item.next_step }) : null,
         el("span", { class: "chips" },
-          el("span", { class: "chip", text: item.type || "" }),
-          item.mood && item.mood !== "Neutral" ? el("span", { class: `chip mood ${MOOD_CLASS[item.mood] || ""}`, text: item.mood }) : null,
+          el("span", { class: `chip topic ${TOPIC_CLASS[item.type] || ""}`.trim(), text: item.type || "" }),
+          item.sender ? el("span", { class: "chip sender", text: item.sender }) : null,
           el("span", { class: "chip box", text: item.mailbox || "" }),
           item.status !== "open" ? el("span", { class: `chip st ${item.status}`, text: STATUS_TEXT[item.status] || item.status }) : null,
           item.waiting ? el("span", { class: item.late ? "age late" : "age", text: `waiting ${item.waiting}` }) : null)));
@@ -242,8 +243,8 @@ async function renderDetail() {
       email.needs_reply ? el("p", { class: "next", text: email.next_step || "" }) : null,
       el("div", { class: "chips" },
         el("span", { class: `prio ${email.priority || ""}`, text: email.priority || "–" }),
-        el("span", { class: "chip", text: email.type || "" }),
-        el("span", { class: `chip mood ${MOOD_CLASS[email.mood] || ""}`, text: email.mood || "" }),
+        el("span", { class: `chip topic ${TOPIC_CLASS[email.type] || ""}`.trim(), text: email.type || "" }),
+        email.sender ? el("span", { class: "chip sender", text: `From a ${email.sender.toLowerCase()}` }) : null,
         el("span", { class: "chip", text: email.needs_reply ? "Needs a reply" : "No reply needed" }))),
     (email.body || "").trim() ? el("div", { class: "body", text: email.body }) : null,
     replyBox(email, keepDraft),
@@ -330,7 +331,7 @@ let inboxToken = 0;
 async function loadInbox() {
   const token = ++inboxToken;
   const s = state();
-  const q = new URLSearchParams({ view: s.view, mailbox: s.mailbox, type: s.type, mood: s.mood });
+  const q = new URLSearchParams({ view: s.view, mailbox: s.mailbox, topic: s.topic, sender: s.sender });
   const data = await api(`/api/inbox?${q}`);
   if (token !== inboxToken) return;
   inbox = data;

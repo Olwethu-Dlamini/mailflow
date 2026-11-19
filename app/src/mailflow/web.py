@@ -213,9 +213,9 @@ def create_app(settings: config.Settings, engine: Engine, store: Store, clock=ti
     # email
 
     @app.get("/api/inbox")
-    async def inbox(view: str = "reply", mailbox: str = "", type: str = "", mood: str = "", user: User = Depends(current_user)):
+    async def inbox(view: str = "reply", mailbox: str = "", topic: str = "", sender: str = "", user: User = Depends(current_user)):
         rows = await engine.recent_rows()
-        result = queue.build(rows, view, mailbox, type, mood, datetime.now(UTC))
+        result = queue.build(rows, view, mailbox, topic, sender, datetime.now(UTC))
         result["reply_mailboxes"] = REPLY_MAILBOXES
         return result
 
