@@ -42,6 +42,14 @@ reads and updates the `MailFlow emails` table through n8n's API and sends Gmail 
 `MailFlow · Reply` takes the header `X-MailFlow-Secret` (credential `MailFlow app secret`) and
 answers `{"result": "sent" | "cannot" | "not_found"}`.
 
+## Error alerts (since 20 November)
+
+`MailFlow · Errors` (Error Trigger → Telegram, credential `RI Email`) is the **Error workflow** of
+every live MailFlow workflow: the two collectors, Process email and Reply. When one fails, Telegram
+gets "⚠️ MailFlow error" with the workflow, the failing step, the error message and a link to the
+execution in n8n. Tested by making a temporary workflow fail on purpose; the message arrived. An
+AI answer that is merely unusable is not an error: that email is saved as *Not sorted* instead.
+
 ## The first pages (n8n, switched off after the app went live)
 
 Kept in n8n, inactive, for rollback. They used the `MailFlow page login` (browser login pop-up).

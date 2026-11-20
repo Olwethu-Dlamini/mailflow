@@ -375,8 +375,8 @@ MailFlow, raise it to `30m` in `/opt/automation/.env`: Mistral then holds about 
 
 | What | How |
 |---|---|
-| Errors | Every MailFlow workflow sets **Error workflow** = `MailFlow · Errors`, which sends the workflow name and error to Telegram (credential `RI Email`) |
-| Cleanup | `MailFlow · Cleanup`: Schedule Trigger at 02:00 → Data Table **Delete** rows where `received_at` is before 90 days ago |
+| Errors | **Built 2026-11-20.** The collectors, Process email and Reply set **Error workflow** = `MailFlow · Errors` (Error Trigger → Telegram, credential `RI Email`): workflow, failing step, message and a link to the execution. n8n requires the error workflow to be active |
+| Cleanup | *Not built yet.* Plan: `MailFlow · Cleanup`, Schedule Trigger at 02:00 → Data Table **Delete** rows where `received_at` is before 90 days ago |
 | Is it working? | The inbox page's **Everything** view lists the newest email first; n8n → Executions lists failed runs (successful runs are not stored on this server) |
 | Backup | Workflows and the table are in n8n's database, covered by the server backup; workflow exports also in the private repo |
 | Adding a mailbox | Duplicate a collector of the same type, choose the new credential, change the `mailbox` label, activate |

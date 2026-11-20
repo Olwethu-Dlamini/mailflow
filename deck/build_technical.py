@@ -243,6 +243,7 @@ s = d.slide("When something breaks", "Symptom → where to look → fix", (
     "saved but the AI's answer was unusable: label them by hand."))
 table(s, MARGIN, TOP - Inches(0.1), [Inches(3.6), Inches(4.2), Inches(4.03)], [
     ["You see", "Where to look", "Usual fix"],
+    ["Telegram '⚠️ MailFlow error'", "The workflow and step named in the message; its n8n link", "Fix the step (often a login); new mail is picked up again"],
     ["'MailFlow engine unreachable'", "n8n container; API key in .env", "Start n8n; replace the key; redeploy"],
     ["Cloudflare error / 502", "docker compose ps on ai; Caddy + cloudflared on srv1", "Restart the container / services"],
     ["No new mail in the queue", "n8n Executions: collectors, Process email", "Re-test the IMAP credential; re-activate"],
@@ -250,7 +251,7 @@ table(s, MARGIN, TOP - Inches(0.1), [Inches(3.6), Inches(4.2), Inches(4.03)], [
     ["Reply 'not sent'", "Gmail OAuth credential in n8n", "Sign in with Google again in the credential"],
     ["Email shows 'Not sorted'", "AI answer was unusable", "Label it by hand; nothing was lost"],
     ["Can't log in (locked)", "5 wrong passwords in 15 min", "Wait 15 min or reset via the CLI"],
-], size=13, row_h=Inches(0.52))
+], size=13, row_h=Inches(0.48))
 
 # 15 --------------------------------------------------------------------------------------------
 s = d.slide("Decisions", "Why it is built this way", (
@@ -273,14 +274,14 @@ table(s, MARGIN, TOP - Inches(0.1), [Inches(0.8), Inches(4.4), Inches(6.63)], [
 
 # 16 --------------------------------------------------------------------------------------------
 s = d.slide("Limits and next steps", "What is not done yet", (
-    "What is not done yet, roughly in order of importance. There is no error alert: if a collector or "
-    "Process email fails, nobody is told; an n8n error workflow to Telegram fixes that. Nothing deletes "
-    "old rows yet; the plan is 90 days. Replies work only for the Gmail mailbox. Mistral takes about "
-    "30 seconds an email, so a big burst queues; a cloud model would be faster but sends text out. "
-    "The app's n8n API key can do everything in n8n, not just the table. And several emails processed "
-    "at the same moment can be saved twice; collectors send one at a time, so this is rare."))
+    "What is not done yet, roughly in order of importance. Failures are now reported: every MailFlow "
+    "workflow sends its errors to Telegram through MailFlow Errors. Nothing deletes old rows yet; the "
+    "plan is 90 days. Replies work only for the Gmail mailbox. Mistral takes about 30 seconds an "
+    "email, so a big burst queues; a cloud model would be faster but sends text out. The app's n8n API "
+    "key can do everything in n8n, not just the table. And several emails processed at the same "
+    "moment can be saved twice; collectors send one at a time, so this is rare."))
 for i, (head, body, fg, bg) in enumerate([
-    ("No error alerts yet", "A failing collector or Process email is silent. Next: an n8n error workflow → Telegram.", RED, RED_SOFT),
+    ("Done: error alerts", "Every MailFlow workflow reports failures to Telegram via 'MailFlow · Errors' (tested 20 Nov).", GREEN, GREEN_SOFT),
     ("No cleanup yet", "Rows are never deleted; the page shows 30 days. Next: nightly delete after 90 days.", AMBER, AMBER_SOFT),
     ("Replies: Gmail only", "Other mailboxes need a sender that keeps the thread (e.g. the DDOService bridge).", AMBER, AMBER_SOFT),
     ("AI speed", "~30 s an email on Mistral; bursts queue. A cloud model is seconds but sends text out.", SKY, SKY_SOFT),
