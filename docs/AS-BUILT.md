@@ -50,6 +50,13 @@ gets "⚠️ MailFlow error" with the workflow, the failing step, the error mess
 execution in n8n. Tested by making a temporary workflow fail on purpose; the message arrived. An
 AI answer that is merely unusable is not an error: that email is saved as *Not sorted* instead.
 
+## Nightly cleanup (since 20 November)
+
+`MailFlow · Cleanup` runs every night at 02:00 (cron `0 2 * * *`, n8n's time zone) and deletes
+rows of `MailFlow emails` whose `received_at` is more than 90 days ago. The mailboxes are not
+touched; only MailFlow's copies go. Its error workflow is `MailFlow · Errors`. Tested with a
+temporary copy on a webhook: a 100-day-old test row was deleted, a 10-day-old one kept.
+
 ## The first pages (n8n, switched off after the app went live)
 
 Kept in n8n, inactive, for rollback. They used the `MailFlow page login` (browser login pop-up).

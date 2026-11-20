@@ -274,15 +274,15 @@ table(s, MARGIN, TOP - Inches(0.1), [Inches(0.8), Inches(4.4), Inches(6.63)], [
 
 # 16 --------------------------------------------------------------------------------------------
 s = d.slide("Limits and next steps", "What is not done yet", (
-    "What is not done yet, roughly in order of importance. Failures are now reported: every MailFlow "
-    "workflow sends its errors to Telegram through MailFlow Errors. Nothing deletes old rows yet; the "
-    "plan is 90 days. Replies work only for the Gmail mailbox. Mistral takes about 30 seconds an "
-    "email, so a big burst queues; a cloud model would be faster but sends text out. The app's n8n API "
-    "key can do everything in n8n, not just the table. And several emails processed at the same "
-    "moment can be saved twice; collectors send one at a time, so this is rare."))
+    "What is not done yet, roughly in order of importance. Two things are now done: every MailFlow "
+    "workflow sends its errors to Telegram, and a nightly cleanup deletes MailFlow's copies of emails "
+    "older than 90 days. Still open: replies work only for the Gmail mailbox. Mistral takes about "
+    "30 seconds an email, so a big burst queues; a cloud model would be faster but sends text out. "
+    "The app's n8n API key can do everything in n8n, not just the table. And several emails "
+    "processed at the same moment can be saved twice; collectors send one at a time, so this is rare."))
 for i, (head, body, fg, bg) in enumerate([
-    ("Done: error alerts", "Every MailFlow workflow reports failures to Telegram via 'MailFlow · Errors' (tested 20 Nov).", GREEN, GREEN_SOFT),
-    ("No cleanup yet", "Rows are never deleted; the page shows 30 days. Next: nightly delete after 90 days.", AMBER, AMBER_SOFT),
+    ("Done: alerts + cleanup", "Failures → Telegram via 'MailFlow · Errors'. Every night at 02:00 rows older than 90 days are deleted (tested 20 Nov).", GREEN, GREEN_SOFT),
+    ("Gmail sign-in", "If the Google app is still in Testing, the Gmail login expires every 7 days: publish it, or sign in again.", AMBER, AMBER_SOFT),
     ("Replies: Gmail only", "Other mailboxes need a sender that keeps the thread (e.g. the DDOService bridge).", AMBER, AMBER_SOFT),
     ("AI speed", "~30 s an email on Mistral; bursts queue. A cloud model is seconds but sends text out.", SKY, SKY_SOFT),
     ("Wide API key", "n8n API keys can do everything; scope it if n8n offers scopes, keep it on the server.", SKY, SKY_SOFT),
