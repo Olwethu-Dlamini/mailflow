@@ -14,7 +14,11 @@ with the AI on the company's own server, sends replies); the page is a small web
 | [docs/WHAT-I-NEED.md](docs/WHAT-I-NEED.md) | Decisions and logins to collect before and during the build |
 | [docs/lessons/](docs/lessons/) | Step-by-step lessons for building it yourself in n8n, one working piece per lesson |
 | [app/](app/) | The MailFlow web app: logins, the queue, replies; how to run and deploy it |
-| [deck/MailFlow.pdf](deck/MailFlow.pdf) | The presentation (also `deck/MailFlow.pptx` to edit) |
+| [deck/MailFlow-Client.pdf](deck/MailFlow-Client.pdf) | Client deck (12 slides): MailFlow for hackathon organisers, with screens of the real app |
+| [deck/MailFlow-Technical.pdf](deck/MailFlow-Technical.pdf) | Technical deck (16 slides): every part, the three journeys, the AI, security, running it, what breaks |
+
+Both decks are built by `deck/build.sh` (PPTX and PDF). Their screens come from the real app showing
+made-up hackathon emails (`deck/demo_server.py`), never real mail.
 
 **This repo is public.** It holds the design, lessons, pictures, deck and the web app's code. Never
 commit mailbox addresses, passwords, API keys, `.env` files, email content or workflow exports here;

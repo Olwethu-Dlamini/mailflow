@@ -6,11 +6,22 @@ shows them all on one web page as a queue. Since 2026-11-19 the labels are for a
 organiser** (§2.3a, decision M12); they started as customer-service labels. It is built in **n8n** on the company's own server
 (`ai`), with the AI running on that server too, so no email has to leave the company.
 
-This repo is **public**. It holds the design, the lessons and the deck: never commit mailbox
-addresses, passwords, API keys or email content here. Exported workflows go in the private
+This repo is **public**. It holds the design, the lessons, the decks and the web app: never commit
+mailbox addresses, passwords, API keys or email content here. Exported workflows go in the private
 `n8n-chatbot` repo (section 10).
 
 ![How MailFlow fits together](images/architecture.png)
+
+**The system today (20 November 2026), in one paragraph.** Mailboxes (Gmail and a self-hosted
+IMAP server) are read by one n8n **collector** each; the shared **Process email** workflow skips
+duplicates, sorts obvious mail by rules and the rest with **Mistral 7B** on `ai` (topic, sender,
+priority, needs reply, summary, next step; an unusable answer is saved as *Not sorted*), stores one
+row per email in an n8n **data table** and sends a Telegram alert for P1. The **MailFlow web app**
+(FastAPI, one Docker container on `ai`, a login per person) shows the queue at
+`https://mailflow.22112002.xyz`, reached through Cloudflare and Caddy on `srv1`; it reads and updates
+the table through n8n's API and sends Gmail replies through the n8n **Reply** workflow. Where each
+part runs: [AS-BUILT.md](AS-BUILT.md). Explained slide by slide:
+[the technical deck](../deck/MailFlow-Technical.pdf); for clients: [the client deck](../deck/MailFlow-Client.pdf).
 
 ## 1. The problem and the goal
 
@@ -209,9 +220,10 @@ mood and mailbox chips, subject, summary, `→ next step` and **waiting X h**, w
 **Email page buttons:** open → **Replied · waiting on customer** and **Done**; waiting → **Done**
 and **Reopen**; done → **Reopen**. Replies are still written in the normal mail app.
 
-The page looks like this (the first version may be plainer):
+The page as it is now (the MailFlow web app, made-up example emails from `deck/demo_server.py`);
+the n8n first version used the [mock-up](images/inbox-mockup.png) as its target:
 
-![Inbox page](images/inbox-mockup.png)
+![The MailFlow page](images/app/queue.png)
 
 **Replying from the page (2026-11-16).** Emails in the `gmail` mailbox get a reply box. It posts
 to `MailFlow · Reply` (`/webhook/mailflow/reply`; since 2026-11-19 Header Auth `X-MailFlow-Secret`,

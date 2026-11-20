@@ -1,7 +1,7 @@
 # MailFlow as built
 
-What is actually running on `ai`, as of **19 November 2026**: the n8n workflows and, since that
-day, the MailFlow web app. The design ([SYSTEM-DESIGN.md](SYSTEM-DESIGN.md)) also covers the parts
+What is actually running, as of **20 November 2026**: the n8n workflows on `ai` and, since 19
+November, the MailFlow web app. The design ([SYSTEM-DESIGN.md](SYSTEM-DESIGN.md)) also covers the parts
 still planned; this page shows only what exists.
 
 ![MailFlow as built](images/as-built.png)
