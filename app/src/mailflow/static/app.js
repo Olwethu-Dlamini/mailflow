@@ -146,8 +146,10 @@ let toastTimer = null;
 // A short message at the bottom; with an action (Undo) it stays a little longer.
 function toast(message, isError = false, action = null) {
   const box = $("toast");
-  box.replaceChildren(el("span", { text: message }),
-    action ? el("button", { type: "button", class: "toast-action", onclick: () => { box.hidden = true; action[1](); } }, action[0], el("kbd", { text: "Z" })) : null);
+  box.replaceChildren(el("span", { text: message }));
+  if (action) {
+    box.append(el("button", { type: "button", class: "toast-action", onclick: action[1] }, action[0], el("kbd", { text: "Z" })));
+  }
   box.classList.toggle("error", isError);
   box.hidden = false;
   clearTimeout(toastTimer);
@@ -239,7 +241,7 @@ function renderUser() {
   $("open-users").hidden = !me.is_admin;
   // A Google-only account has no password to change.
   $("open-password").hidden = Boolean(me.google_only);
-  for (const item of document.querySelectorAll("#user-menu [data-icon]")) item.prepend(icon(item.dataset.icon));
+  for (const item of document.querySelectorAll("[data-icon]")) item.prepend(icon(item.dataset.icon));
 }
 
 function toggleMenu(open = $("user-menu").hidden) {
@@ -690,28 +692,36 @@ $("password-form").addEventListener("submit", async (event) => {
   }
 });
 
+let googleSignIn = false; // whether "Continue with Google" is on; then a user may have no password
+
+function badge(text, cls = "") {
+  return el("span", { class: `chip ${cls}`.trim(), text });
+}
+
 async function loadUsers() {
   const users = await api("/api/users");
   $("users-body").replaceChildren(...users.map((user) => {
     const self = user.id === me.id;
-    const actions = self ? [el("span", { class: "muted", text: "you" })] : [
+    const ways = [
+      user.google_only ? null : badge("Password"),
+      user.google_linked ? badge("Google", "google") : user.google_only ? badge("Google, not yet used", "google") : null,
+    ];
+    const actions = self ? [el("span", { class: "muted small", text: "That's you" })] : [
       el("button", {
         type: "button", class: "btn small",
+        onclick: () => openReset(user),
+      }, user.google_only ? "Set a password" : "Reset password"),
+      el("button", {
+        type: "button", class: user.active ? "btn small danger" : "btn small",
         onclick: () => userAction(`/api/users/${user.id}/${user.active ? "disable" : "enable"}`),
       }, user.active ? "Disable" : "Enable"),
-      el("button", {
-        type: "button", class: "btn small",
-        onclick: () => {
-          const password = prompt(`New password for ${user.email} (at least 12 characters):`);
-          if (password) userAction(`/api/users/${user.id}/reset`, { password });
-        },
-      }, "Reset password"),
     ];
     return el("tr", { class: user.active ? "" : "disabled" },
-      el("td", { text: user.name }),
-      el("td", { text: user.email }),
-      el("td", { text: `${user.is_admin ? "Admin" : "Staff"}${user.active ? "" : " · disabled"}` }),
-      el("td", { class: "row-buttons" }, actions));
+      el("td", {}, el("span", { class: "person" }, avatar(user.name, "sm"),
+        el("span", { class: "who" }, el("b", { text: user.name }), el("span", { text: user.email })))),
+      el("td", {}, badge(user.is_admin ? "Admin" : "Staff", user.is_admin ? "role" : ""), user.active ? null : badge("Disabled", "off")),
+      el("td", {}, el("span", { class: "chips" }, ways)),
+      el("td", {}, el("span", { class: "row-actions" }, actions)));
   }));
 }
 
@@ -723,6 +733,35 @@ async function userAction(path, body = {}) {
   } catch (error) {
     toast(error.message, true);
   }
+}
+
+let resetting = null;
+function openReset(user) {
+  resetting = user;
+  $("reset-who").textContent = `${user.name} · ${user.email}`;
+  $("reset-form").reset();
+  openDialog($("reset-dialog"));
+}
+$("reset-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    await api(`/api/users/${resetting.id}/reset`, { method: "POST", body: { password: event.target.password.value } });
+    $("reset-dialog").close();
+    toast(`New password set for ${resetting.name}.`);
+    await loadUsers();
+  } catch (error) {
+    formError(event.target, error.message);
+  }
+});
+
+// With Google sign-in on, the first password may stay empty: that person signs in with Google only.
+function setPasswordRule() {
+  const input = $("add-user-form").password;
+  input.required = !googleSignIn;
+  if (googleSignIn) input.removeAttribute("minlength");
+  $("first-password-label").textContent = googleSignIn
+    ? "First password (leave empty: Google sign-in only)"
+    : "First password (12+ characters)";
 }
 
 $("open-users").addEventListener("click", async () => {
@@ -741,9 +780,12 @@ $("add-user-form").addEventListener("submit", async (event) => {
       method: "POST",
       body: { name: form.name.value, email: form.email.value, password: form.password.value, is_admin: form.is_admin.checked },
     });
+    const googleOnly = !form.password.value;
     form.reset();
     form.querySelector(".error").hidden = true;
-    toast("User added. Give them their first password; they can change it after logging in.");
+    toast(googleOnly
+      ? "User added. They sign in with Continue with Google, using that email address."
+      : "User added. Give them their first password; they can change it after signing in.");
     await loadUsers();
   } catch (error) {
     formError(form, error.message);
@@ -808,6 +850,10 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   renderUser();
+  api("/api/login-options").then((options) => {
+    googleSignIn = Boolean(options.google);
+    setPasswordRule();
+  }).catch(() => {});
   $("list").replaceChildren(...listSkeleton());
   $("search").value = state().q;
   await render();

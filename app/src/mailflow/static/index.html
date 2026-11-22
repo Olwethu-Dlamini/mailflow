@@ -82,26 +82,43 @@
 
 <dialog id="users-dialog">
   <div class="dialog-body">
-    <h2>Users</h2>
+    <div class="dialog-head">
+      <h2>Users</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close" data-icon="x"></button>
+    </div>
     <table class="users">
-      <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
+      <thead><tr><th>Person</th><th>Role</th><th>Signs in with</th><th></th></tr></thead>
       <tbody id="users-body"></tbody>
     </table>
-    <form id="add-user-form">
+    <form id="add-user-form" class="add-user">
       <h3>Add a user</h3>
       <div class="grid">
         <label>Name <input name="name" required></label>
         <label>Email <input type="email" name="email" required></label>
-        <label>First password (12+ characters) <input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
+        <label><span id="first-password-label">First password (12+ characters)</span>
+          <input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
         <label class="check"><input type="checkbox" name="is_admin"> Admin (can manage users)</label>
       </div>
       <p class="error" role="alert" hidden></p>
       <div class="row-buttons">
         <button type="submit" class="btn primary">Add user</button>
-        <button type="button" class="btn" data-close>Close</button>
       </div>
     </form>
   </div>
+</dialog>
+
+<dialog id="reset-dialog" class="narrow">
+  <form id="reset-form" method="dialog">
+    <h2>Reset password</h2>
+    <p class="muted" id="reset-who"></p>
+    <label>New password (at least 12 characters) <input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
+    <p class="muted small">Their sessions end; give them the new password, they can change it after signing in.</p>
+    <p class="error" role="alert" hidden></p>
+    <div class="row-buttons">
+      <button type="submit" class="btn primary">Set password</button>
+      <button type="button" class="btn" data-close>Cancel</button>
+    </div>
+  </form>
 </dialog>
 </body>
 </html>
