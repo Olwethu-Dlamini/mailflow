@@ -14,10 +14,33 @@ browser ──https──▶ Cloudflare ──tunnel──▶ srv1 Caddy ──�
 | Emails | n8n data table, read and updated through n8n's API (key in `.env`, never sent to the browser) |
 | Replies | `POST http://n8n:5678/webhook/mailflow/reply` with header `X-MailFlow-Secret` (n8n credential `MailFlow app secret`) |
 
+## The page
+
+![The MailFlow page](../docs/images/app/queue.png)
+
+Three panes, after Front, Help Scout and Superhuman: the sidebar (search, views with counts,
+mailboxes, refresh state, the account menu; it collapses to icons with `[`), the queue, and the
+open email (action bar, AI card, the message, the reply box). Light and dark follow the system.
+On a phone the sidebar is a drawer and one pane shows at a time.
+
+| Key | Does | Key | Does |
+|---|---|---|---|
+| `J` / `K` | next / previous email | `E` | Done |
+| `/` | search the list | `W` | replied, waiting on the customer |
+| `1`–`5` | Needs reply, P1, Waiting, Done, Everything | `U` | reopen |
+| `Esc` | close the email | `R` | write a reply (`Ctrl`+`Enter` sends) |
+| `?` | all shortcuts | `Z` | undo the last status change |
+
+Marking an email Done or Waiting opens the next one in the list, with Undo in the toast.
+
 ## Security
 
 - One account per person; an admin adds people under **Users**. Passwords are scrypt-hashed and
   need at least 12 characters.
+- **Continue with Google** (optional, below) opens a session only for an account an admin already
+  added: never a new account. The first Google sign-in links the account by its verified email;
+  after that Google's account id (`sub`) must match, so another Google account with that address
+  cannot take it over. A disabled account is refused either way.
 - 5 failed logins on one email lock it for 15 minutes; 20 from one address block that address.
   Behind srv1 the visitor's address comes from Cloudflare's `Cf-Connecting-IP`, believed only on
   requests from `TRUSTED_PROXY`.
@@ -25,6 +48,28 @@ browser ──https──▶ Cloudflare ──tunnel──▶ srv1 Caddy ──�
   password change or when the user is disabled.
 - Every change must carry `X-MailFlow: 1` and come from `SITE_ORIGIN`; strict Content Security
   Policy, no inline script. Email text is always shown as text.
+
+## Continue with Google (optional)
+
+Off until both settings are in `.env`. To turn it on:
+
+1. Google Cloud console → **APIs & Services → Credentials → Create credentials → OAuth client ID**,
+   type **Web application** (the n8n Gmail client can stay as it is; this is a second client).
+2. **Authorised redirect URI**: `https://mailflow.22112002.xyz/auth/google/callback`
+   (`SITE_ORIGIN` + `/auth/google/callback`; for the laptop also `http://127.0.0.1:8770/auth/google/callback`).
+3. The OAuth consent screen asks only for `openid email profile`. Publish it, or while it is in
+   *Testing* add each person as a test user.
+4. Put `GOOGLE_CLIENT_ID=…` and `GOOGLE_CLIENT_SECRET=…` in `/opt/mailflow/app/.env` and run the
+   deploy script again. The sign-in page then shows the button.
+
+People still need an account: an admin adds them under **Users** with the email address of their
+Google account. With Google on, the first password may be left empty: that person can only sign
+in with Google (an admin can set a password later).
+
+How it works: `GET /auth/google` stores a one-time state (PKCE verifier and nonce, 10 minutes) and
+sends the browser to Google with the state in a SameSite=Lax cookie; `/auth/google/callback`
+checks the state against that cookie, swaps the code for the ID token directly with Google, checks
+issuer, audience, expiry, nonce and a verified email, and opens the normal session.
 
 ## Run on the laptop (against n8n on `ai`)
 

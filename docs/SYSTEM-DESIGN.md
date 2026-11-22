@@ -201,6 +201,13 @@ open email). It reads and updates the data table through n8n's API and calls `Ma
 with a secret header. The n8n page workflows below were the first version; they were switched off
 on 2026-11-19 when the app went live, and are kept in n8n for rollback.
 
+**Redesign (2026-11-22, decision M13).** Laid out after Front, Help Scout and Superhuman: a sidebar
+with search, the views and the mailboxes (collapsible; a drawer on phones); Topic and Sender as
+filter chips over the list; slimmer rows; the open email with an action bar, an AI card and a
+reply card; keyboard shortcuts (J/K, E, W, U, R, Z, /, ?), the next email opening after Done or
+Waiting with Undo, dark mode, and an optional **Continue with Google** sign-in for existing
+accounts ([app/README.md](../app/README.md)). Views, sorting and the late rule are unchanged.
+
 The first version: both pages are n8n workflows that start with a **Webhook** node (method GET,
 authentication **Basic Auth**) and end with **Respond to Webhook** returning HTML.
 
@@ -224,6 +231,8 @@ The page as it is now (the MailFlow web app, made-up example emails from `deck/d
 the n8n first version used the [mock-up](images/inbox-mockup.png) as its target:
 
 ![The MailFlow page](images/app/queue.png)
+
+Dark mode and the sign-in page: [queue-dark.png](images/app/queue-dark.png), [login.png](images/app/login.png).
 
 **Replying from the page (2026-11-16).** Emails in the `gmail` mailbox get a reply box. It posts
 to `MailFlow · Reply` (`/webhook/mailflow/reply`; since 2026-11-19 Header Auth `X-MailFlow-Secret`,
@@ -363,7 +372,7 @@ MailFlow, raise it to `30m` in `/opt/automation/.env`: Mistral then holds about 
 
 | Risk | Control |
 |---|---|
-| The page shows company email, on the internet | The web app (M11): one account per person, scrypt passwords of 12+ characters; 5 failed logins lock an email and 20 lock a visitor's address for 15 min; HttpOnly, Secure, SameSite=Strict session cookie (12 h idle, 7 days); changes need the page's own header and origin; strict Content Security Policy; email text shown only as text. Reached only through Cloudflare and srv1 (the port is bound to ai's LAN address) |
+| The page shows company email, on the internet | The web app (M11): one account per person, scrypt passwords of 12+ characters; 5 failed logins lock an email and 20 lock a visitor's address for 15 min; HttpOnly, Secure, SameSite=Strict session cookie (12 h idle, 7 days); changes need the page's own header and origin; strict Content Security Policy; email text shown only as text. Reached only through Cloudflare and srv1 (the port is bound to ai's LAN address). Optional Google sign-in (M13) only for accounts an admin added, keyed on Google's account id after the first sign-in; state, nonce and PKCE on every attempt |
 | n8n's webhooks are reachable from the internet through `https://n8n.22112002.xyz/webhook/…` (DDOService decision D16) | `MailFlow · Reply` needs the `X-MailFlow-Secret` header (403 without it); the old page webhooks are switched off. The n8n API key the app uses stays on the server |
 | Mailbox passwords and keys | Only in n8n credentials (encrypted in n8n's database); never in workflows, exports or this repo |
 | Email text sent to an AI | Default is local Ollama: nothing leaves the server. A cloud model needs the company's OK first |
@@ -419,6 +428,7 @@ MailFlow, raise it to `30m` in `/opt/automation/.env`: Mistral then holds about 
 | M10 | Replies from the page through the **Gmail node** (Gmail mailbox only, 2026-11-16) | n8n Send Email node; extending the DDOService bridge | The owner's choice for now; the Gmail node threads replies and files them in Sent, Send Email cannot set `In-Reply-To`. Costs a Google Cloud project and n8n on https |
 | M11 | The page as a **separate web app** (FastAPI, plain HTML/JS, one container on `ai`) at `mailflow.22112002.xyz`, **one account per person** (2026-11-19) | Keep n8n Webhook + HTML pages with Basic Auth (M7); a shared login; Google sign-in; Tailscale identity | The owner wants a real site, public on the company domain, with n8n as the engine. Per-person accounts allow "who did what" and assignment later. FastAPI like ollagi, ~60 MB of the VM's memory; n8n keeps every mailbox login and the AI |
 | M12 | **Hackathon-organiser labels** (2026-11-19): topic (15 hackathon topics), sender (who is writing) instead of mood, P1-P3 rules for an event; replaced everywhere, old rows re-sorted | Keep customer service; per-mailbox schemes; mood and sender both | The owner's use case is a hackathon organiser: who is writing and what about decides the answer, mood did not. Sender keeps the AI at six fields, so the speed stays the same. Platform mail (Devpost, Eventbrite, Luma, MLH) is caught by rules |
+| M13 | **Redesign after Front / Help Scout / Superhuman, plus optional Google sign-in** (2026-11-22): sidebar with search, keyboard triage with Undo, dark mode; Google OpenID Connect for accounts an admin already added | Keep the 2026-11-19 page; Google sign-in that creates accounts on first use; a JWT library to check the ID token's signature | The owner found the page hard to work in and asked for Google sign-in. No self sign-up keeps "one account per person, added by an admin" (M11). The ID token comes straight from Google's token endpoint over TLS with the client secret, which Google's guide accepts without a signature check, so no new dependency |
 
 ## 12. Risks
 
