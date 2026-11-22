@@ -26,6 +26,7 @@
     <div id="user-menu" class="menu" role="menu" hidden>
       <button id="open-users" type="button" role="menuitem" data-icon="users" hidden>Manage users</button>
       <button id="open-password" type="button" role="menuitem" data-icon="key">Change password</button>
+      <button id="open-shortcuts" type="button" role="menuitem" data-icon="keyboard">Keyboard shortcuts <kbd>?</kbd></button>
       <hr>
       <button id="logout" type="button" role="menuitem" data-icon="logout">Sign out</button>
     </div>
@@ -39,6 +40,30 @@
 </main>
 
 <p id="toast" class="toast" role="status" hidden></p>
+
+<dialog id="shortcuts-dialog" class="narrow">
+  <h2>Keyboard shortcuts</h2>
+  <div class="keys">
+    <section>
+      <h3>Move</h3>
+      <p><span><kbd>J</kbd> <kbd>↓</kbd></span> Next email</p>
+      <p><span><kbd>K</kbd> <kbd>↑</kbd></span> Previous email</p>
+      <p><span><kbd>Esc</kbd></span> Close the email</p>
+      <p><span><kbd>1</kbd>–<kbd>5</kbd></span> Needs reply, P1, Waiting, Done, Everything</p>
+      <p><span><kbd>/</kbd></span> Search</p>
+      <p><span><kbd>[</kbd></span> Collapse or expand the sidebar</p>
+    </section>
+    <section>
+      <h3>Act on the open email</h3>
+      <p><span><kbd>E</kbd></span> Done</p>
+      <p><span><kbd>W</kbd></span> Replied, waiting on the customer</p>
+      <p><span><kbd>U</kbd></span> Reopen</p>
+      <p><span><kbd>R</kbd></span> Write a reply</p>
+      <p><span><kbd>Ctrl</kbd> <kbd>↵</kbd></span> Send the reply</p>
+    </section>
+  </div>
+  <div class="row-buttons"><button type="button" class="btn" data-close>Close</button></div>
+</dialog>
 
 <dialog id="password-dialog">
   <form id="password-form" method="dialog">

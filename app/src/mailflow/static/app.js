@@ -56,6 +56,7 @@ const ICONS = {
   arrowLeft: ["m12 19-7-7 7-7", "M19 12H5"],
   undo: ["M3 7v6h6", "M21 17a9 9 0 0 0-15-6.7L3 13"],
   info: ["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z", "M12 16v-4", "M12 8h.01"],
+  keyboard: ["M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z", "M6 9h.01", "M10 9h.01", "M14 9h.01", "M18 9h.01", "M8 15h8"],
 };
 const SVG = "http://www.w3.org/2000/svg";
 
@@ -401,6 +402,7 @@ function row(item, selected) {
         state().mailbox ? null : el("span", { class: "boxname" }, el("span", { class: `dot ${colourOf(item.mailbox)}` }), item.mailbox || ""))));
 }
 
+let scrolledTo = "";
 function renderList() {
   const s = state();
   const list = $("list");
@@ -418,11 +420,16 @@ function renderList() {
     return;
   }
   list.replaceChildren(header, ...items.map((item) => row(item, String(item.id) === s.id)));
+  // Keep the open email in sight when J/K move past the edge of the list (only when it changes,
+  // so a background refresh never scrolls the list away from where the reader left it).
+  if (s.id && s.id !== scrolledTo) list.querySelector(".item.selected")?.scrollIntoView({ block: "nearest" });
+  scrolledTo = s.id;
 }
 
 // --- right: one email -------------------------------------------------------
 
 let detailToken = 0;
+let openEmail = null; // the email on the right, for the E/W/U keys
 
 function placeholder(iconName, title, text) {
   return el("div", { class: "placeholder" },
@@ -465,6 +472,7 @@ async function renderDetail() {
   const detail = $("detail");
   document.body.classList.toggle("has-detail", Boolean(s.id));
   if (!s.id) {
+    openEmail = null;
     detail.dataset.id = "";
     detail.replaceChildren(placeholder("inbox", "No email open", "Pick one from the list, or press J to start at the top."));
     return;
@@ -476,6 +484,7 @@ async function renderDetail() {
     email = await api(`/api/emails/${encodeURIComponent(s.id)}`);
   } catch (error) {
     if (token !== detailToken) return;
+    openEmail = null;
     detail.dataset.id = "";
     detail.replaceChildren(detailBar(null), placeholder("warning", "This email could not open", error.message));
     return;
@@ -483,6 +492,7 @@ async function renderDetail() {
   if (token !== detailToken) return;
   const keepDraft = detail.dataset.id === s.id ? detail.querySelector("textarea")?.value || "" : "";
   detail.dataset.id = s.id;
+  openEmail = email;
   const name = email.from_name || email.from_address || "";
   const unsorted = email.sorted_by === "unsorted";
   detail.replaceChildren(
@@ -638,6 +648,7 @@ function formError(form, message) {
 }
 
 $("open-password").addEventListener("click", () => openDialog($("password-dialog")));
+$("open-shortcuts").addEventListener("click", () => openDialog($("shortcuts-dialog")));
 $("password-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.target;
@@ -718,6 +729,45 @@ $("logout").addEventListener("click", async () => {
   }
 });
 $("sync").addEventListener("click", render);
+
+// --- keyboard ---------------------------------------------------------------
+
+// Single keys as in Gmail, Front and Superhuman. They stay out of the way while typing and
+// while a dialog is open; Ctrl/Alt/Cmd combinations belong to the browser.
+function typing(target) {
+  return target.closest("input, textarea, select, [contenteditable]") !== null;
+}
+
+function act(to) {
+  if (openEmail && (BUTTONS[openEmail.status] || []).some(([status]) => status === to)) setStatus(openEmail.id, to);
+}
+
+function step(by) {
+  const id = neighbour(by);
+  if (id) go({ id });
+}
+
+const KEYS = {
+  j: () => step(1), ArrowDown: () => step(1),
+  k: () => step(-1), ArrowUp: () => step(-1),
+  e: () => act("done"), w: () => act("waiting"), u: () => act("open"),
+  r: () => $("detail").querySelector(".reply textarea")?.focus(),
+  "/": () => $("search").focus(),
+  "[": () => $("collapse").click(),
+  "?": () => openDialog($("shortcuts-dialog")),
+  Escape: () => state().id && go({ id: "" }),
+  1: () => go({ view: "reply", id: "" }), 2: () => go({ view: "p1", id: "" }), 3: () => go({ view: "waiting", id: "" }),
+  4: () => go({ view: "done", id: "" }), 5: () => go({ view: "all", id: "" }),
+};
+
+document.addEventListener("keydown", (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+  if (document.querySelector("dialog[open]") || typing(event.target) || !$("user-menu").hidden) return;
+  const handler = KEYS[event.key];
+  if (!handler) return;
+  event.preventDefault();
+  handler();
+});
 
 // --- start ------------------------------------------------------------------
 
