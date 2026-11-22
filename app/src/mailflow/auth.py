@@ -7,6 +7,8 @@ The page is on the internet, so:
 - an unknown email and a wrong password get the same answer and take about as long;
 - a session is a random token; only its SHA-256 is stored. It ends IDLE_SECONDS after its last use,
   MAX_SECONDS after login, at logout, or when the user's password changes or the user is disabled.
+- "Continue with Google" opens a session only for an existing, active account: matched on Google's
+  account id once linked, else on the verified email (which links it). No account is ever created.
 """
 
 import base64
@@ -14,6 +16,7 @@ import hashlib
 import hmac
 import secrets
 
+from .google import Identity
 from .store import Store, User, normal_email
 
 MIN_PASSWORD = 12
@@ -23,10 +26,12 @@ LOCK_SECONDS = 15 * 60
 IDLE_SECONDS = 12 * 3600
 MAX_SECONDS = 7 * 24 * 3600
 TOUCH_EVERY = 60  # write last_seen at most once a minute per session
+GOOGLE_START_SECONDS = 10 * 60  # a Google sign-in must come back within this
 
 _N, _R, _P = 2**14, 8, 1
 REFUSED = "Wrong email or password."
 LOCKED = "Too many failed logins. Try again in 15 minutes."
+NO_GOOGLE_ACCOUNT = "This Google account has no MailFlow account."
 
 
 class LoginRefused(Exception):
@@ -92,9 +97,38 @@ def login(store: Store, email: str, password: str, client_ip: str, now: float) -
         raise LoginRefused(REFUSED)
 
     store.forget_failures(email_key)
+    return _open_session(store, user, now)
+
+
+def _open_session(store: Store, user: User, now: float) -> tuple[str, User]:
     token = secrets.token_urlsafe(32)
     store.add_session(_token_hash(token), user.id, now)
     return token, user
+
+
+def google_begin(store: Store, state: str, verifier: str, nonce: str, now: float) -> None:
+    store.add_google_start(_token_hash(state), verifier, nonce, now)
+
+
+def google_resume(store: Store, state: str, now: float) -> tuple[str, str] | None:
+    """(PKCE verifier, nonce) for a state this app handed out in the last GOOGLE_START_SECONDS; once."""
+    return store.take_google_start(_token_hash(state), now - GOOGLE_START_SECONDS)
+
+
+def google_login(store: Store, identity: Identity, now: float) -> tuple[str, User]:
+    """Returns (session token, user) or raises LoginRefused."""
+    store.prune(failures_before=now - 24 * 3600, sessions_before=now - MAX_SECONDS)
+    user = store.user_by_google_sub(identity.sub)
+    if user is None:
+        # First Google sign-in: the verified email finds the account, unless another Google account
+        # already owns it.
+        by_email = store.user_by_email(identity.email)
+        if by_email and by_email.active and by_email.google_sub is None:
+            store.link_google(by_email.id, identity.sub)
+            user = store.user_by_id(by_email.id)
+    if user is None or not user.active:
+        raise LoginRefused(NO_GOOGLE_ACCOUNT)
+    return _open_session(store, user, now)
 
 
 def check_current_password(store: Store, user: User, password: str, client_ip: str, now: float) -> None:

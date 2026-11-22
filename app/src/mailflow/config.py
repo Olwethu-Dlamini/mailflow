@@ -15,6 +15,9 @@ class Settings:
     cookie_secure: bool  # False only for testing over plain http on the laptop
     trusted_proxy: str  # srv1's LAN address: only through it is Cloudflare's Cf-Connecting-IP believed
     site_origin: str  # e.g. https://mailflow.22112002.xyz; POSTs from any other origin are refused
+    # "Continue with Google": on only when both are set (Google Cloud → Clients → Web application)
+    google_client_id: str = ""
+    google_client_secret: str = ""
 
 
 def _need(name: str) -> str:
@@ -24,8 +27,17 @@ def _need(name: str) -> str:
     return value
 
 
+def _google() -> tuple[str, str]:
+    client_id = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+    secret = os.environ.get("GOOGLE_CLIENT_SECRET", "").strip()
+    if bool(client_id) != bool(secret):
+        raise SystemExit("Set both GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET, or neither")
+    return client_id, secret
+
+
 def from_env() -> Settings:
     n8n_url = os.environ.get("N8N_URL", "http://n8n:5678").rstrip("/")
+    google_client_id, google_client_secret = _google()
     return Settings(
         n8n_url=n8n_url,
         n8n_api_key=_need("N8N_API_KEY"),
@@ -38,4 +50,6 @@ def from_env() -> Settings:
         # everyone out. "none" (laptop testing, no proxy) uses each connection's own address.
         trusted_proxy="" if _need("TRUSTED_PROXY").lower() == "none" else _need("TRUSTED_PROXY"),
         site_origin=_need("SITE_ORIGIN").rstrip("/"),
+        google_client_id=google_client_id,
+        google_client_secret=google_client_secret,
     )

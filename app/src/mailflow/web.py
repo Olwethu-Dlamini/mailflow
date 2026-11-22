@@ -4,24 +4,27 @@ Run: uvicorn --factory mailflow.web:main_app
 """
 
 import logging
+import secrets
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import auth, config, queue
+from .google import CALLBACK_PATH, GoogleLogin, GoogleRefused
 from .n8n import STATUSES, Engine, EngineDown
-from .store import Store, User
+from .store import NO_PASSWORD, Store, User
 
 log = logging.getLogger(__name__)
 
 STATIC = Path(__file__).parent / "static"
 COOKIE = "mf_session"
+GOOGLE_COOKIE = "mf_oauth"  # the state of a Google sign-in in progress, for this browser only
 REPLY_MAILBOXES = ["gmail"]  # MailFlow · Reply sends through the Gmail node only
 MAX_REPLY = 20_000
 MAX_BODY = 64 * 1024  # bytes; a reply is at most MAX_REPLY characters
@@ -30,6 +33,13 @@ CSP = (
     "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'"
 )
 CHANGE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+# After Google, the session cookie is set on a page that then moves on by itself: the SameSite=Strict
+# cookie would not be sent on a redirect chain that started on accounts.google.com.
+SIGNED_IN_PAGE = (
+    '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+    '<meta http-equiv="refresh" content="0;url=/"><title>MailFlow</title></head>'
+    '<body><a href="/">Continue to MailFlow</a></body></html>'
+)
 
 
 class ApiError(Exception):
@@ -58,7 +68,7 @@ class Reply(BaseModel):
 class NewUser(BaseModel):
     email: str
     name: str
-    password: str
+    password: str = ""  # empty: a Google-only account (allowed when Google sign-in is on)
     is_admin: bool = False
 
 
@@ -67,15 +77,21 @@ class Reset(BaseModel):
 
 
 def _user_json(user: User) -> dict:
-    return {"id": user.id, "email": user.email, "name": user.name, "is_admin": user.is_admin, "active": user.active}
+    return {
+        "id": user.id, "email": user.email, "name": user.name, "is_admin": user.is_admin, "active": user.active,
+        "google_linked": user.google_sub is not None, "google_only": user.google_only,
+    }
 
 
-def create_app(settings: config.Settings, engine: Engine, store: Store, clock=time.time) -> FastAPI:
+def create_app(
+    settings: config.Settings, engine: Engine, store: Store, clock=time.time, google: GoogleLogin | None = None
+) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         yield
-        if hasattr(engine, "aclose"):
-            await engine.aclose()
+        for client in (engine, google):
+            if hasattr(client, "aclose"):
+                await client.aclose()
 
     app = FastAPI(title="MailFlow", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 
@@ -125,7 +141,7 @@ def create_app(settings: config.Settings, engine: Engine, store: Store, clock=ti
         response.headers["X-Frame-Options"] = "DENY"
         if settings.cookie_secure:
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
-        if request.url.path.startswith("/api/"):
+        if request.url.path.startswith(("/api/", "/auth/")):
             response.headers["Cache-Control"] = "no-store"
         elif request.url.path.startswith("/static/") or request.url.path in ("/", "/login"):
             # Re-check with the server on every load (a cheap 304), so a deploy reaches everyone at once.
@@ -172,16 +188,70 @@ def create_app(settings: config.Settings, engine: Engine, store: Store, clock=ti
 
     # session
 
+    def _with_session(response, token: str):
+        response.set_cookie(
+            COOKIE, token, max_age=auth.MAX_SECONDS, httponly=True, secure=settings.cookie_secure, samesite="strict", path="/"
+        )
+        return response
+
+    @app.get("/api/login-options")
+    def login_options():
+        return {"google": google is not None}
+
     @app.post("/api/login")
     def login(body: Login, request: Request):
         try:
             token, user = auth.login(store, body.email, body.password, client_ip(request), clock())
         except auth.LoginRefused as refused:
             raise ApiError(401, str(refused)) from None
-        response = JSONResponse(_user_json(user))
+        return _with_session(JSONResponse(_user_json(user)), token)
+
+    # Continue with Google. Failures go back to the login page with a short code it explains.
+
+    def _google_failed(code: str) -> RedirectResponse:
+        response = RedirectResponse(f"/login?error={code}", 303)
+        response.delete_cookie(GOOGLE_COOKIE, path="/auth/google")
+        return response
+
+    @app.get("/auth/google")
+    def google_start():
+        if google is None:
+            raise ApiError(404, "Google sign-in is not set up.")
+        start = google.start()
+        auth.google_begin(store, start.state, start.verifier, start.nonce, clock())
+        response = RedirectResponse(start.url, 303)
+        # Lax, not Strict: the browser must send it on Google's redirect back to the callback.
         response.set_cookie(
-            COOKIE, token, max_age=auth.MAX_SECONDS, httponly=True, secure=settings.cookie_secure, samesite="strict", path="/"
+            GOOGLE_COOKIE, start.state, max_age=auth.GOOGLE_START_SECONDS, httponly=True,
+            secure=settings.cookie_secure, samesite="lax", path="/auth/google",
         )
+        return response
+
+    @app.get(CALLBACK_PATH)
+    async def google_callback(request: Request, code: str = "", state: str = "", error: str = ""):
+        if google is None:
+            raise ApiError(404, "Google sign-in is not set up.")
+        if error:
+            return _google_failed("google_denied")
+        mine = request.cookies.get(GOOGLE_COOKIE, "")
+        if not (state and mine and secrets.compare_digest(state, mine)):
+            return _google_failed("google_state")
+        started = auth.google_resume(store, state, clock())
+        if started is None or not code:
+            return _google_failed("google_state")
+        try:
+            identity = await google.finish(code, *started, clock())
+        except GoogleRefused as refused:
+            log.warning("Google sign-in failed: %s", refused)
+            return _google_failed("google_failed")
+        try:
+            token, user = auth.google_login(store, identity, clock())
+        except auth.LoginRefused:
+            log.info("Google sign-in refused for %s: no active MailFlow account", identity.email)
+            return _google_failed("google_no_account")
+        log.info("%s signed in with Google", user.email)
+        response = _with_session(HTMLResponse(SIGNED_IN_PAGE), token)
+        response.delete_cookie(GOOGLE_COOKIE, path="/auth/google")
         return response
 
     @app.post("/api/logout")
@@ -271,8 +341,14 @@ def create_app(settings: config.Settings, engine: Engine, store: Store, clock=ti
         if "@" not in body.email or not body.name.strip():
             raise ApiError(400, "An email address and a name are needed.")
         try:
-            auth.check_password_rule(body.password)
-            user_id = store.add_user(body.email, body.name, auth.hash_password(body.password), body.is_admin)
+            if body.password:
+                auth.check_password_rule(body.password)
+                pw_hash = auth.hash_password(body.password)
+            elif google is not None:
+                pw_hash = NO_PASSWORD
+            else:
+                raise ValueError(f"The password needs at least {auth.MIN_PASSWORD} characters.")
+            user_id = store.add_user(body.email, body.name, pw_hash, body.is_admin)
         except ValueError as error:
             raise ApiError(400, str(error)) from None
         return _user_json(store.user_by_id(user_id))
@@ -311,4 +387,5 @@ def create_app(settings: config.Settings, engine: Engine, store: Store, clock=ti
 def main_app() -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     settings = config.from_env()
-    return create_app(settings, Engine(settings), Store(settings.db_path))
+    google = GoogleLogin(settings) if settings.google_client_id else None
+    return create_app(settings, Engine(settings), Store(settings.db_path), google=google)
