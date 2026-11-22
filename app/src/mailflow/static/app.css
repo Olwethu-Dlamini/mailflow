@@ -430,6 +430,8 @@ table.users tr.disabled .person { opacity: .55; }
   .detail-bar { padding: 0 10px; }
   .detail-bar kbd, .detail-bar .nav-arrows { display: none; }
   .detail-body { padding: 18px 16px 40px; }
+  .sender { flex-wrap: wrap; row-gap: 2px; }
+  .sender .when { order: 3; width: 100%; padding-left: 52px; }
   body.has-detail .list { display: none; }
   body.has-detail .detail { display: block; }
   .detail-bar .back { display: inline-grid; }
