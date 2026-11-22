@@ -5,6 +5,7 @@ memory only.
 
 Run:   cd app && uv run python ../deck/demo_server.py      (then open http://127.0.0.1:8780)
 Login: demo@mailflow.example / demo-password-123
+(The Google button shows, but leads to Google's error page: the demo has no real Google client.)
 """
 
 import tempfile
@@ -15,6 +16,7 @@ import uvicorn
 
 from mailflow import auth, web
 from mailflow.config import Settings
+from mailflow.google import GoogleLogin
 from mailflow.store import Store
 from mailflow.web import create_app
 
@@ -117,8 +119,10 @@ def main() -> None:
     settings = Settings(
         n8n_url="http://demo", n8n_api_key="demo", table_id="demo", reply_url="http://demo", reply_secret="demo",
         db_path=str(db), cookie_secure=False, trusted_proxy="", site_origin="http://127.0.0.1:8780",
+        google_client_id="demo.apps.googleusercontent.com", google_client_secret="demo",
     )
-    uvicorn.run(create_app(settings, DemoEngine(), store), host="127.0.0.1", port=8780, log_level="warning")
+    app = create_app(settings, DemoEngine(), store, google=GoogleLogin(settings))
+    uvicorn.run(app, host="127.0.0.1", port=8780, log_level="warning")
 
 
 if __name__ == "__main__":

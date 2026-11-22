@@ -3,20 +3,63 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Log in · MailFlow</title>
+<meta name="color-scheme" content="light dark">
+<title>Sign in · MailFlow</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/login.js" defer></script>
 </head>
 <body class="login-page">
-<main class="login-card">
-  <h1 class="brand"><span class="mark" aria-hidden="true">M</span>MailFlow</h1>
-  <p class="muted">All company mail, sorted for customer service.</p>
-  <form id="login-form" novalidate>
-    <label>Email <input type="email" name="email" autocomplete="username" required autofocus></label>
-    <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
-    <p id="login-error" class="error" role="alert" hidden></p>
-    <button type="submit" class="btn primary">Log in</button>
-  </form>
+<main class="auth">
+  <section class="auth-pitch" aria-hidden="true">
+    <div class="brand"><span class="mark">M</span>MailFlow</div>
+    <div class="pitch">
+      <h2>Every mailbox.<br>One calm queue.</h2>
+      <ul class="pitch-points">
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 17v4M17 19h4"/></svg>
+          <span><b>Sorted before you look.</b> Topic, sender, P1 to P3 and the next step on every email.</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <span><b>Nothing slips.</b> A P1 waiting over 4 hours, or a P2 over a day, turns red.</span>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 010 11H11"/></svg>
+          <span><b>Answer in place.</b> Replies leave from the same Gmail conversation.</span>
+        </li>
+      </ul>
+    </div>
+    <div class="pitch-preview">
+      <div class="pv-row"><span class="avatar c2">TB</span><span class="pv-main"><b>Team Byte Me</b><span>Devpost won't accept our video</span></span><span class="prio P1">P1</span></div>
+      <div class="pv-row"><span class="avatar c1">LK</span><span class="pv-main"><b>Lindiwe Khoza</b><span>Gold sponsorship: contract and invoice</span></span><span class="prio P1">P1</span></div>
+      <div class="pv-row"><span class="avatar c4">AZ</span><span class="pv-main"><b>Ayanda Zulu</b><span>Can I still register?</span></span><span class="prio P2">P2</span></div>
+    </div>
+  </section>
+
+  <section class="auth-form">
+    <div class="auth-card">
+      <div class="brand"><span class="mark" aria-hidden="true">M</span>MailFlow</div>
+      <h1>Sign in</h1>
+      <p class="muted">Every mailbox, sorted for the team.</p>
+      <a id="google" class="btn-google" href="/auth/google" hidden>
+        <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        <span>Continue with Google</span>
+      </a>
+      <div id="or" class="or" hidden>or with email</div>
+      <form id="login-form" novalidate>
+        <label>Email <input type="email" name="email" autocomplete="username" required autofocus></label>
+        <label>Password
+          <span class="pw">
+            <input type="password" name="password" autocomplete="current-password" required>
+            <button type="button" class="pw-toggle" aria-label="Show password" aria-pressed="false">Show</button>
+          </span>
+        </label>
+        <p id="login-error" class="notice" role="alert" hidden></p>
+        <button type="submit" class="btn primary block">Sign in</button>
+      </form>
+      <p class="fine">An admin adds accounts and resets passwords.</p>
+    </div>
+  </section>
 </main>
 </body>
 </html>

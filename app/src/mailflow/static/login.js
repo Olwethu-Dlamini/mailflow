@@ -1,20 +1,51 @@
 "use strict";
 
 const form = document.getElementById("login-form");
-const error = document.getElementById("login-error");
+const notice = document.getElementById("login-error");
+const toggle = form.querySelector(".pw-toggle");
 
-if (new URLSearchParams(location.search).get("changed") === "1") {
-  error.textContent = "Password changed. Log in with the new one.";
-  error.classList.add("ok");
-  error.hidden = false;
+// Codes the server puts on /login after a Google sign-in that did not work out.
+const GOOGLE_ERRORS = {
+  google_denied: "Google sign-in was cancelled.",
+  google_state: "That Google sign-in expired or was started in another tab. Try again.",
+  google_failed: "Google sign-in did not work. Try again, or use your password.",
+  google_no_account: "That Google account has no MailFlow access. Ask an admin to add your email address.",
+};
+
+function show(message, ok = false) {
+  notice.textContent = message;
+  notice.classList.toggle("ok", ok);
+  notice.hidden = false;
 }
+
+const query = new URLSearchParams(location.search);
+if (query.get("changed") === "1") show("Password changed. Sign in with the new one.", true);
+if (GOOGLE_ERRORS[query.get("error")]) show(GOOGLE_ERRORS[query.get("error")]);
+if (query.has("changed") || query.has("error")) history.replaceState(null, "", "/login");
+
+fetch("/api/login-options")
+  .then((response) => (response.ok ? response.json() : {}))
+  .then((options) => {
+    document.getElementById("google").hidden = !options.google;
+    document.getElementById("or").hidden = !options.google;
+  })
+  .catch(() => {});
+
+toggle.addEventListener("click", () => {
+  const showing = form.password.type === "text";
+  form.password.type = showing ? "password" : "text";
+  toggle.textContent = showing ? "Show" : "Hide";
+  toggle.setAttribute("aria-pressed", String(!showing));
+  toggle.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+  form.password.focus();
+});
 
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const button = form.querySelector("button");
+  const button = form.querySelector("button[type=submit]");
   button.disabled = true;
-  error.hidden = true;
-  error.classList.remove("ok");
+  button.textContent = "Signing in…";
+  notice.hidden = true;
   try {
     const response = await fetch("/api/login", {
       method: "POST",
@@ -26,12 +57,12 @@ form.addEventListener("submit", async (event) => {
       return;
     }
     const body = await response.json().catch(() => ({}));
-    error.textContent = body.error || "Login failed.";
+    show(body.error || "Sign-in failed.");
   } catch {
-    error.textContent = "MailFlow could not be reached. Check your connection.";
+    show("MailFlow could not be reached. Check your connection.");
   }
-  error.hidden = false;
   form.password.value = "";
   form.password.focus();
   button.disabled = false;
+  button.textContent = "Sign in";
 });
