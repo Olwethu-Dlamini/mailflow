@@ -208,6 +208,14 @@ def test_state_must_match_this_browser_and_works_once(world):
     assert len(fake.requests) == 1  # the replay never reached Google
 
 
+def test_a_state_with_non_ascii_characters_is_refused_not_a_crash(world):
+    client, fake, _ = world
+    start(client, fake)
+    response = client.get("/auth/google/callback?code=c&state=%C3%A9t%C3%A9", follow_redirects=False)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login?error=google_state"
+
+
 def test_google_errors_go_back_to_the_login_page(world):
     client, fake, _ = world
     start(client, fake)

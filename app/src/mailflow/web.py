@@ -234,7 +234,8 @@ def create_app(
         if error:
             return _google_failed("google_denied")
         mine = request.cookies.get(GOOGLE_COOKIE, "")
-        if not (state and mine and secrets.compare_digest(state, mine)):
+        # as bytes: compare_digest refuses str with non-ASCII characters, and ?state= is anyone's
+        if not (state and mine and secrets.compare_digest(state.encode(), mine.encode())):
             return _google_failed("google_state")
         started = auth.google_resume(store, state, clock())
         if started is None or not code:
