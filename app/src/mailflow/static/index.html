@@ -3,31 +3,40 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>MailFlow</title>
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/app.js" defer></script>
 </head>
-<body>
-<header class="topbar">
-  <span class="brand"><span class="mark" aria-hidden="true">M</span>MailFlow</span>
-  <span id="need-reply" class="meta"></span>
-  <span id="p1-count" class="p1-pill" hidden></span>
-  <span id="total" class="meta"></span>
-  <span class="spacer"></span>
-  <button id="refresh" class="btn ghost" type="button" title="Refresh now">Refresh</button>
-  <span class="user-chip"><span id="me-avatar" class="avatar sm" aria-hidden="true"></span><span id="me"></span></span>
-  <button id="open-users" class="btn ghost" type="button" hidden>Users</button>
-  <button id="open-password" class="btn ghost" type="button">Change password</button>
-  <button id="logout" class="btn ghost" type="button">Log out</button>
-</header>
+<body class="app">
+<aside class="sidebar" id="sidebar" aria-label="Views and mailboxes">
+  <div class="side-top">
+    <span class="brand"><span class="mark" aria-hidden="true">M</span><span class="brand-name">MailFlow</span></span>
+    <button id="collapse" class="icon-btn collapse-btn" type="button" title="Collapse the sidebar  [" aria-label="Collapse the sidebar"></button>
+  </div>
+  <label class="search">
+    <span class="search-icon" aria-hidden="true"></span>
+    <input id="search" type="search" placeholder="Search" aria-label="Search the list" autocomplete="off" spellcheck="false">
+    <kbd aria-hidden="true">/</kbd>
+  </label>
+  <nav id="nav"></nav>
+  <div class="side-foot">
+    <button id="sync" class="sync" type="button" title="Refresh now"></button>
+    <button id="user-btn" class="user-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu"></button>
+    <div id="user-menu" class="menu" role="menu" hidden>
+      <button id="open-users" type="button" role="menuitem" data-icon="users" hidden>Manage users</button>
+      <button id="open-password" type="button" role="menuitem" data-icon="key">Change password</button>
+      <hr>
+      <button id="logout" type="button" role="menuitem" data-icon="logout">Sign out</button>
+    </div>
+  </div>
+</aside>
+<div class="scrim" id="scrim" hidden></div>
 
-<div class="panes" id="panes">
-  <nav class="sidebar" id="sidebar" aria-label="Views and filters"></nav>
+<main class="panes" id="panes">
   <section class="list" id="list" aria-label="Emails"></section>
-  <section class="detail" id="detail" aria-label="Open email">
-    <p class="placeholder">Pick an email from the list.</p>
-  </section>
-</div>
+  <section class="detail" id="detail" aria-label="Open email"></section>
+</main>
 
 <p id="toast" class="toast" role="status" hidden></p>
 
