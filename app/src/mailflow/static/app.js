@@ -17,10 +17,14 @@ const SORTED_BY = {
   rule: "Sorted by a rule",
   unsorted: "Not sorted: the AI's answer was unusable, so the labels below are placeholders",
 };
+// [to, label, class, icon, shortcut, tooltip] for each state an email can be in
 const BUTTONS = {
-  open: [["waiting", "Replied · waiting on customer", "wait"], ["done", "Done", "done"]],
-  waiting: [["done", "Done", "done"], ["open", "Reopen", ""]],
-  done: [["open", "Reopen", ""]],
+  open: [
+    ["waiting", "Waiting", "wait", "clock", "W", "Replied: now waiting on the customer"],
+    ["done", "Done", "done", "check", "E", "Nothing more to do"],
+  ],
+  waiting: [["done", "Done", "done", "check", "E", "Nothing more to do"], ["open", "Reopen", "", "undo", "U", "Back to open"]],
+  done: [["open", "Reopen", "", "undo", "U", "Back to open"]],
 };
 const REFRESH_MS = 60_000;
 const TIME_ZONE = "Africa/Mbabane";
@@ -48,6 +52,10 @@ const ICONS = {
   logout: ["M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4", "m16 17 5-5-5-5", "M21 12H9"],
   refresh: ["M3 12a9 9 0 0 1 15-6.7L21 8", "M21 3v5h-5", "M21 12a9 9 0 0 1-15 6.7L3 16", "M8 16H3v5"],
   warning: ["m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3z", "M12 9v4", "M12 17h.01"],
+  sparkles: ["M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z", "M19 17v4", "M17 19h4"],
+  arrowLeft: ["m12 19-7-7 7-7", "M19 12H5"],
+  undo: ["M3 7v6h6", "M21 17a9 9 0 0 0-15-6.7L3 13"],
+  info: ["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z", "M12 16v-4", "M12 8h.01"],
 };
 const SVG = "http://www.w3.org/2000/svg";
 
@@ -416,76 +424,122 @@ function renderList() {
 
 let detailToken = 0;
 
+function placeholder(iconName, title, text) {
+  return el("div", { class: "placeholder" },
+    el("span", { class: "empty-icon" }, icon(iconName)), el("b", { text: title }), text ? el("p", { text }) : null);
+}
+
+// The email above or below the open one in the list as shown (search included).
+function neighbour(step) {
+  if (!inbox) return null;
+  const items = visibleItems();
+  const at = items.findIndex((item) => String(item.id) === state().id);
+  const next = at === -1 ? items[0] : items[at + step];
+  return next ? String(next.id) : null;
+}
+
+function statusButtons(email) {
+  return (BUTTONS[email.status] || BUTTONS.done).map(([to, label, cls, iconName, key, title]) =>
+    el("button", { type: "button", class: `btn ${cls}`, title, onclick: () => setStatus(email.id, to) },
+      icon(iconName), label, el("kbd", { text: key })));
+}
+
+function detailBar(email) {
+  const arrow = (step, iconName, label, key) => {
+    const id = neighbour(step);
+    return el("button", {
+      type: "button", class: "icon-btn", title: `${label}  ${key}`, "aria-label": label, disabled: !id,
+      onclick: () => id && go({ id }),
+    }, icon(iconName));
+  };
+  return el("div", { class: "detail-bar" },
+    el("button", { type: "button", class: "icon-btn back", "aria-label": "Back to the list", onclick: () => go({ id: "" }) }, icon("arrowLeft")),
+    el("span", { class: "nav-arrows" }, arrow(-1, "chevronUp", "Previous email", "K"), arrow(1, "chevronDown", "Next email", "J")),
+    email ? el("span", { class: `chip st ${email.status}`, text: STATUS_TEXT[email.status] || email.status }) : null,
+    el("span", { class: "spacer" }),
+    email ? statusButtons(email) : null);
+}
+
 async function renderDetail() {
   const s = state();
   const detail = $("detail");
   document.body.classList.toggle("has-detail", Boolean(s.id));
   if (!s.id) {
-    detail.replaceChildren(el("p", { class: "placeholder", text: "Pick an email from the list." }));
+    detail.dataset.id = "";
+    detail.replaceChildren(placeholder("inbox", "No email open", "Pick one from the list, or press J to start at the top."));
     return;
   }
   const token = ++detailToken;
-  if (detail.dataset.id !== s.id) detail.replaceChildren(el("p", { class: "placeholder", text: "Loading…" }));
+  if (detail.dataset.id !== s.id) detail.replaceChildren(detailBar(null), placeholder("inbox", "Opening…"));
   let email;
   try {
     email = await api(`/api/emails/${encodeURIComponent(s.id)}`);
   } catch (error) {
     if (token !== detailToken) return;
     detail.dataset.id = "";
-    detail.replaceChildren(backButton(), el("p", { class: "placeholder", text: error.message }));
+    detail.replaceChildren(detailBar(null), placeholder("warning", "This email could not open", error.message));
     return;
   }
   if (token !== detailToken) return;
+  const keepDraft = detail.dataset.id === s.id ? detail.querySelector("textarea")?.value || "" : "";
   detail.dataset.id = s.id;
-  const keepDraft = detail.querySelector("textarea")?.value || "";
+  const name = email.from_name || email.from_address || "";
+  const unsorted = email.sorted_by === "unsorted";
   detail.replaceChildren(
-    backButton(),
-    el("div", { class: "detail-head" },
+    detailBar(email),
+    el("article", { class: "detail-body" },
       el("h1", { class: "detail-subject", text: email.subject || "(no subject)" }),
-      el("div", { class: "toolbar" },
-        el("span", { class: `chip st ${email.status}`, text: STATUS_TEXT[email.status] || email.status }),
-        el("span", { class: "spacer" }),
-        (BUTTONS[email.status] || BUTTONS.done).map(([to, label, cls]) =>
-          el("button", { type: "button", class: `btn ${cls}`, onclick: () => setStatus(email.id, to) }, label)))),
-    el("div", { class: "sender" },
-      avatar(email.from_name || email.from_address, "lg"),
-      el("div", { class: "sender-text" },
-        el("div", {}, el("span", { class: "sender-name", text: email.from_name || email.from_address || "" }),
-          email.from_name ? el("span", { class: "muted", text: ` <${email.from_address || ""}>` }) : null),
-        el("div", { class: "muted small", text: `to ${email.mailbox || ""} · ${showTime(email.received_at, fullTime)}` }))),
-    el("section", { class: "ai" },
-      el("div", { class: "ai-label", text: SORTED_BY[email.sorted_by] || SORTED_BY.ai }),
-      el("p", { class: "summary", text: email.summary || "" }),
-      email.needs_reply ? el("p", { class: "next", text: email.next_step || "" }) : null,
-      el("div", { class: "chips" },
-        el("span", { class: `prio ${email.priority || ""}`, text: email.priority || "–" }),
-        el("span", { class: `chip topic ${TOPIC_CLASS[email.type] || ""}`.trim(), text: email.type || "" }),
+      el("div", { class: "chips detail-tags" },
+        email.priority ? el("span", { class: `prio ${email.priority}`, text: email.priority }) : null,
+        email.type ? el("span", { class: `chip topic ${TOPIC_CLASS[email.type] || ""}`.trim(), text: email.type }) : null,
         email.sender ? el("span", { class: "chip role", text: email.sender }) : null,
-        el("span", { class: "chip", text: email.needs_reply ? "Needs a reply" : "No reply needed" }))),
-    (email.body || "").trim() ? el("div", { class: "body", text: email.body }) : null,
-    replyBox(email, keepDraft),
+        el("span", { class: "boxname" }, el("span", { class: `dot ${colourOf(email.mailbox)}` }), email.mailbox || ""),
+        el("span", { class: "chip", text: email.needs_reply ? "Needs a reply" : "No reply needed" })),
+      el("section", { class: unsorted ? "ai unsorted" : "ai", "aria-label": "What the AI made of it" },
+        el("div", { class: "ai-label" }, icon(unsorted ? "warning" : "sparkles"), SORTED_BY[email.sorted_by] || SORTED_BY.ai),
+        el("p", { class: "summary", text: email.summary || "" }),
+        email.needs_reply && email.next_step
+          ? el("div", { class: "next-step" }, icon("reply"), el("span", {}, el("b", { text: "Next step: " }), email.next_step))
+          : null),
+      el("section", { class: "message", "aria-label": "The email" },
+        el("div", { class: "sender" },
+          avatar(name, "lg"),
+          el("div", { class: "sender-text" },
+            el("div", {}, el("span", { class: "sender-name", text: name }),
+              email.from_name ? el("span", { class: "muted", text: ` <${email.from_address || ""}>` }) : null),
+            el("div", { class: "muted small", text: `to ${email.mailbox || ""}` })),
+          el("span", { class: "when", text: showTime(email.received_at, fullTime) })),
+        (email.body || "").trim()
+          ? el("div", { class: "body", text: email.body })
+          : el("div", { class: "body none", text: "This email has no text." })),
+      replyBox(email, keepDraft)),
   );
-}
-
-function backButton() {
-  return el("button", { type: "button", class: "btn ghost back", onclick: () => go({ id: "" }) }, "← Back to the list");
 }
 
 function replyBox(email, draft) {
   if (!email.can_reply) {
-    return el("p", { class: "hint" }, "Reply from the ", el("b", { text: email.mailbox || "" }), " mailbox in your mail app, then mark it here.");
+    return el("p", { class: "note" }, icon("info"),
+      el("span", {}, "Replies from MailFlow go out through Gmail only. Answer from the ", el("b", { text: email.mailbox || "" }),
+        " mailbox in your mail app, then mark it Waiting or Done here."));
   }
   if (email.status === "done") return null;
-  const text = el("textarea", { rows: "7", required: true, placeholder: "Write your reply…", "aria-label": "Reply" });
+  const text = el("textarea", { rows: "6", required: true, placeholder: `Write to ${email.from_name || email.from_address}…`, "aria-label": "Reply" });
   text.value = draft;
-  const send = el("button", { type: "submit", class: "btn primary" }, "Send reply");
+  const send = el("button", { type: "submit", class: "btn primary" }, "Send", el("kbd", { text: "Ctrl ↵" }));
+  // Ctrl+Enter (⌘+Enter on a Mac) sends, as in Gmail and Front.
+  text.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      form.requestSubmit();
+    }
+  });
   const form = el("form", {
     class: "reply",
     onsubmit: async (event) => {
       event.preventDefault();
       if (!text.value.trim()) return;
       send.disabled = true;
-      send.textContent = "Sending…";
+      send.firstChild.textContent = "Sending…";
       try {
         await api(`/api/emails/${email.id}/reply`, { method: "POST", body: { text: text.value } });
         text.value = "";
@@ -495,14 +549,15 @@ function replyBox(email, draft) {
         toast(error.message, true);
       } finally {
         send.disabled = false;
-        send.textContent = "Send reply";
+        send.firstChild.textContent = "Send";
       }
     },
   },
-    el("label", {}, `Reply to ${email.from_name || email.from_address} from the `, el("b", { text: email.mailbox }), " mailbox"),
+    el("div", { class: "reply-to" }, icon("reply"), el("span", {}, "Reply from ", el("b", { text: email.mailbox }), " to ", el("b", { text: email.from_address || "" }))),
     text,
-    el("div", { class: "row-buttons" }, send,
-      el("span", { class: "hint", text: "Sent in the same Gmail conversation; the email then moves to Waiting on customer." })));
+    el("div", { class: "reply-foot" },
+      el("span", { class: "hint", text: "Sent in the same Gmail conversation; the email then moves to Waiting." }),
+      send));
   return form;
 }
 
