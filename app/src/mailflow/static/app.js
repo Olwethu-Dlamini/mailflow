@@ -27,6 +27,8 @@ const TIME_ZONE = "Africa/Mbabane";
 const listTime = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 const fullTime = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 const clockTime = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" });
+const dayKey = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+const shortDay = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, day: "numeric", month: "short" });
 
 // Line icons, 24×24, drawn with the current text colour (shapes after Lucide, ISC licence).
 const ICONS = {
@@ -328,41 +330,86 @@ function listHead(shown) {
       s.q ? pill(`“${s.q}”`, () => { $("search").value = ""; go({ q: "" }); }) : null));
 }
 
+// "14:20" today, "Yesterday", else "20 Nov": the full time is in the tooltip.
+function shortTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const day = dayKey.format(date);
+  if (day === dayKey.format(new Date())) return clockTime.format(date);
+  if (day === dayKey.format(new Date(Date.now() - 86_400_000))) return "Yesterday";
+  return shortDay.format(date);
+}
+
+const EMPTY = {
+  reply: ["All caught up", "Nothing needs a reply right now."],
+  p1: ["No P1s open", "Nothing urgent is waiting for you."],
+  waiting: ["Nobody to wait for", "Emails you have answered show here until the sender writes back."],
+  done: ["Nothing done yet", "Emails marked Done in the last 30 days show here."],
+  all: ["No email yet", "Nothing arrived in the last 30 days."],
+};
+
+function emptyState({ kind = "", iconName, title, text, action }) {
+  return el("div", { class: `empty ${kind}`.trim() },
+    el("span", { class: "empty-icon" }, icon(iconName)),
+    el("b", { text: title }),
+    el("p", { text }),
+    action ? el("button", { type: "button", class: "btn", onclick: action[1] }, action[0]) : null);
+}
+
+// Grey bars where the rows will be, while the first list loads.
+function listSkeleton() {
+  return Array.from({ length: 6 }, () => el("div", { class: "skeleton", "aria-hidden": "true" },
+    el("i", { class: "round" }),
+    el("span", { class: "lines" }, el("i", { class: "w40" }), el("i", { class: "w85" }), el("i", { class: "w65" }))));
+}
+
+function row(item, selected) {
+  const name = item.from_name || item.from_address || "(unknown sender)";
+  return el("button", {
+    type: "button",
+    class: `item ${item.status} ${item.status !== "done" ? item.priority || "" : ""}${selected ? " selected" : ""}`,
+    "aria-current": selected ? "true" : null,
+    "data-id": String(item.id),
+    onclick: () => go({ id: String(item.id) }),
+  },
+    avatar(name),
+    el("span", { class: "item-main" },
+      el("span", { class: "item-top" },
+        el("span", { class: "from", text: name }),
+        item.waiting ? el("span", { class: item.late ? "age late" : "age", title: item.late ? "Waiting longer than its priority allows" : "Waiting for a reply" },
+          icon("clock"), item.waiting) : null,
+        el("span", { class: "time", title: showTime(item.received_at, fullTime), text: shortTime(item.received_at) })),
+      el("span", { class: "subject-line" },
+        item.priority ? el("span", { class: `prio ${item.priority}`, text: item.priority }) : null,
+        el("span", { class: "subject", text: item.subject || "(no subject)" })),
+      item.needs_reply && item.status === "open" && item.next_step
+        ? el("span", { class: "next" }, icon("reply"), el("span", { text: item.next_step }))
+        : el("span", { class: "summary", text: item.summary || "" }),
+      el("span", { class: "chips" },
+        item.type ? el("span", { class: `chip topic ${TOPIC_CLASS[item.type] || ""}`.trim(), text: item.type }) : null,
+        item.sender ? el("span", { class: "chip role", text: item.sender }) : null,
+        // the state only where a view mixes them
+        ["all", "p1"].includes(inbox.view) && item.status !== "open" ? el("span", { class: `chip st ${item.status}`, text: STATUS_TEXT[item.status] }) : null,
+        state().mailbox ? null : el("span", { class: "boxname" }, el("span", { class: `dot ${colourOf(item.mailbox)}` }), item.mailbox || ""))));
+}
+
 function renderList() {
   const s = state();
   const list = $("list");
   const items = visibleItems();
   const header = listHead(items.length);
   if (!items.length) {
-    list.replaceChildren(header, el("p", { class: "empty", text: "Nothing here." }));
+    const filtered = s.mailbox || s.topic || s.sender || s.q;
+    const [title, text] = EMPTY[inbox.view] || EMPTY.all;
+    list.replaceChildren(header, filtered
+      ? emptyState({ iconName: "search", title: "No emails match", text: "Nothing in this view matches the filters.", action: ["Clear filters", () => {
+        $("search").value = "";
+        go({ mailbox: "", topic: "", sender: "", q: "", id: "" });
+      }] })
+      : emptyState({ kind: ["reply", "p1"].includes(inbox.view) ? "good" : "", iconName: inbox.view === "reply" || inbox.view === "p1" ? "check" : "inbox", title, text }));
     return;
   }
-  const rows = items.map((item) => {
-    const selected = String(item.id) === s.id;
-    return el("button", {
-      type: "button",
-      class: `item ${item.status}${selected ? " selected" : ""}`,
-      "aria-current": selected ? "true" : null,
-      onclick: () => go({ id: String(item.id) }),
-    },
-      avatar(item.from_name || item.from_address),
-      el("span", { class: "item-main" },
-        el("span", { class: "item-top" },
-          el("span", { class: "from", text: item.from_name || item.from_address || "(unknown sender)" }),
-          el("span", { class: "time", text: showTime(item.received_at, listTime) })),
-        el("span", { class: "subject-line" },
-          el("span", { class: `prio ${item.priority || ""}`, text: item.priority || "–" }),
-          el("span", { class: "subject", text: item.subject || "(no subject)" })),
-        el("span", { class: "summary", text: item.summary || "" }),
-        item.needs_reply && item.status !== "done" && item.next_step ? el("span", { class: "next", text: item.next_step }) : null,
-        el("span", { class: "chips" },
-          el("span", { class: `chip topic ${TOPIC_CLASS[item.type] || ""}`.trim(), text: item.type || "" }),
-          item.sender ? el("span", { class: "chip role", text: item.sender }) : null,
-          el("span", { class: "chip box", text: item.mailbox || "" }),
-          item.status !== "open" ? el("span", { class: `chip st ${item.status}`, text: STATUS_TEXT[item.status] || item.status }) : null,
-          item.waiting ? el("span", { class: item.late ? "age late" : "age", text: `waiting ${item.waiting}` }) : null)));
-  });
-  list.replaceChildren(header, ...rows);
+  list.replaceChildren(header, ...items.map((item) => row(item, String(item.id) === s.id)));
 }
 
 // --- right: one email -------------------------------------------------------
@@ -499,13 +546,22 @@ async function loadInbox() {
   renderList();
 }
 
+// A failed load keeps the list already on screen (flagged as not refreshed); with nothing to keep
+// it says what went wrong and offers to try again.
 async function render() {
   try {
     await Promise.all([loadInbox(), renderDetail()]);
   } catch (error) {
-    if (error.status !== 401) {
-      $("list").replaceChildren(el("p", { class: "empty error", text: error.message }));
+    if (error.status === 401) return;
+    syncError = error.message;
+    renderSync();
+    if (inbox) {
+      toast(error.message, true);
+      return;
     }
+    $("list").replaceChildren(emptyState({
+      kind: "bad", iconName: "warning", title: "The list could not load", text: error.message, action: ["Try again", render],
+    }));
   }
 }
 
@@ -617,6 +673,7 @@ $("sync").addEventListener("click", render);
     return;
   }
   renderUser();
+  $("list").replaceChildren(...listSkeleton());
   $("search").value = state().q;
   await render();
   setInterval(backgroundRefresh, REFRESH_MS);
