@@ -143,9 +143,11 @@ async function api(path, { method = "GET", body } = {}) {
 }
 
 let toastTimer = null;
-// A short message at the bottom; with an action (Undo) it stays a little longer.
+// A short message at the bottom; with an action (Undo) it stays a little longer. Undo lives exactly
+// as long as its toast: any other toast replaces the offer, and Z then does nothing.
 function toast(message, isError = false, action = null) {
   const box = $("toast");
+  if (!action) undo = null;
   box.replaceChildren(el("span", { text: message }));
   if (action) {
     box.append(el("button", { type: "button", class: "toast-action", onclick: action[1] }, action[0], el("kbd", { text: "Z" })));
@@ -482,7 +484,11 @@ async function renderDetail() {
     return;
   }
   const token = ++detailToken;
-  if (detail.dataset.id !== s.id) detail.replaceChildren(detailBar(null), placeholder("inbox", "Opening…"));
+  if (detail.dataset.id !== s.id) {
+    // E/W/U must not reach the previous email while this one loads.
+    openEmail = null;
+    detail.replaceChildren(detailBar(null), placeholder("inbox", "Opening…"));
+  }
   let email;
   try {
     email = await api(`/api/emails/${encodeURIComponent(s.id)}`);
