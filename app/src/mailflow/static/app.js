@@ -143,13 +143,15 @@ async function api(path, { method = "GET", body } = {}) {
 }
 
 let toastTimer = null;
-function toast(message, isError = false) {
+// A short message at the bottom; with an action (Undo) it stays a little longer.
+function toast(message, isError = false, action = null) {
   const box = $("toast");
-  box.textContent = message;
+  box.replaceChildren(el("span", { text: message }),
+    action ? el("button", { type: "button", class: "toast-action", onclick: () => { box.hidden = true; action[1](); } }, action[0], el("kbd", { text: "Z" })) : null);
   box.classList.toggle("error", isError);
   box.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { box.hidden = true; }, isError ? 8000 : 3500);
+  toastTimer = setTimeout(() => { box.hidden = true; undo = null; }, isError ? 8000 : action ? 6000 : 3500);
 }
 
 // --- state in the address bar ----------------------------------------------
@@ -571,14 +573,41 @@ function replyBox(email, draft) {
   return form;
 }
 
-async function setStatus(id, to) {
+// Does an email with this status still belong in the view on screen?
+const STAYS = { reply: (to) => to === "open", p1: (to) => to !== "done", waiting: (to) => to === "waiting", done: (to) => to === "done", all: () => true };
+let undo = null; // the last status change, while its toast is up
+function runUndo() {
+  const u = undo;
+  undo = null;
+  if (u) {
+    $("toast").hidden = true;
+    u();
+  }
+}
+
+// Change an email's status. When that takes it out of the view, open the next one (as Superhuman
+// and Front do), and offer Undo, which puts the status back and reopens the email.
+async function setStatus(id, to, { quiet = false } = {}) {
+  const before = openEmail && String(openEmail.id) === String(id) ? openEmail.status : inbox?.items.find((item) => item.id === id)?.status;
+  const wasOpen = state().id === String(id);
+  const leaves = inbox && !(STAYS[inbox.view] || STAYS.all)(to);
+  const next = wasOpen && leaves ? neighbour(1) || neighbour(-1) || "" : null;
   try {
     await api(`/api/emails/${id}/status`, { method: "POST", body: { to } });
-    toast(`Marked ${STATUS_TEXT[to]}.`);
-    await render();
   } catch (error) {
     toast(error.message, true);
+    return;
   }
+  if (quiet) {
+    toast(`Back to ${STATUS_TEXT[to]}.`);
+  } else if (before && before !== to) {
+    undo = () => setStatus(id, before, { quiet: true }).then(() => go({ id: String(id) }));
+    toast(`Marked ${STATUS_TEXT[to]}.`, false, ["Undo", runUndo]);
+  } else {
+    toast(`Marked ${STATUS_TEXT[to]}.`);
+  }
+  if (next !== null) go({ id: next });
+  else await render();
 }
 
 // --- loading ------------------------------------------------------------------
@@ -751,6 +780,7 @@ const KEYS = {
   j: () => step(1), ArrowDown: () => step(1),
   k: () => step(-1), ArrowUp: () => step(-1),
   e: () => act("done"), w: () => act("waiting"), u: () => act("open"),
+  z: runUndo,
   r: () => $("detail").querySelector(".reply textarea")?.focus(),
   "/": () => $("search").focus(),
   "[": () => $("collapse").click(),

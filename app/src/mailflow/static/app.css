@@ -313,7 +313,11 @@ body.app { flex-direction: row; background: var(--canvas); }
 .placeholder p { margin: 0; font-size: 13px; }
 
 /* toast and dialogs */
-.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); margin: 0; padding: 10px 16px; border-radius: var(--radius); background: var(--toast); color: var(--toast-fg); font-size: 13px; box-shadow: var(--shadow-md); z-index: 10; max-width: 90vw; }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 40; display: flex; align-items: center; gap: 14px; max-width: 90vw; margin: 0; padding: 8px 8px 8px 16px; border-radius: 10px; background: var(--toast); color: var(--toast-fg); font-size: 13px; box-shadow: var(--shadow-lg); }
+.toast:not(:has(.toast-action)) { padding-right: 16px; }
+.toast-action { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px 0 10px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--toast-fg) 14%, transparent); color: inherit; font-weight: 600; cursor: pointer; }
+.toast-action:hover { background: color-mix(in srgb, var(--toast-fg) 22%, transparent); }
+.toast-action kbd { border-color: color-mix(in srgb, var(--toast-fg) 35%, transparent); background: transparent; color: inherit; opacity: .8; }
 .toast.error { background: var(--red); color: #fff; }
 dialog { border: 1px solid var(--line); border-radius: 12px; padding: 24px; box-shadow: var(--shadow-lg); max-width: min(760px, 94vw); width: 100%; color: var(--text); background: var(--bg); }
 dialog::backdrop { background: var(--backdrop); }
