@@ -91,7 +91,11 @@ def login(store: Store, email: str, password: str, client_ip: str, now: float) -
     _check_not_locked(store, email_key, ip_key, now)
 
     user = store.user_by_email(email)
-    ok = verify_password(password, user.pw_hash if user else _DUMMY_HASH)
+    # A Google-only account's placeholder hash would fail at once; hash against the dummy instead so
+    # the answer takes as long as for an unknown email, and nothing tells the two apart.
+    ok = verify_password(password, user.pw_hash if user and not user.google_only else _DUMMY_HASH)
+    if user and user.google_only:
+        ok = False
     if not (user and ok and user.active):
         _fail(store, email_key, ip_key, now)
         raise LoginRefused(REFUSED)
