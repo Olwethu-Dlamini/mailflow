@@ -792,6 +792,7 @@ function applyLocally(id, to, restore = null) {
 // the view, the next one opens, and Undo is offered. The server is told in the background; if it
 // refuses, the list is loaded again so the page shows the truth.
 let pending = 0;
+const saving = new Map(); // email id → its last save, which the next one waits for
 async function setStatus(id, to, { quiet = false, restore = null } = {}) {
   const listed = inbox?.items.find((item) => item.id === id) || restore?.item;
   const before = listed?.status ?? (openEmail?.id === id ? openEmail.status : undefined);
@@ -827,15 +828,22 @@ async function setStatus(id, to, { quiet = false, restore = null } = {}) {
     toast(`Marked ${STATUS_TEXT[to]}.`);
   }
 
+  // Saves for one email go one after another, so an Undo can never reach n8n before the change it
+  // undoes; and no list is fetched while a save is under way (it would show the old status).
   pending += 1;
+  const run = (saving.get(id) || Promise.resolve()).catch(() => {}).then(() =>
+    api(`/api/emails/${id}/status`, { method: "POST", body: { to } }));
+  saving.set(id, run);
   try {
-    await api(`/api/emails/${id}/status`, { method: "POST", body: { to } });
+    await run;
   } catch (error) {
     pending -= 1;
     toast(`Not saved: ${error.message}`, true);
     emails.delete(String(id));
     await render();
     return;
+  } finally {
+    if (saving.get(id) === run) saving.delete(id);
   }
   pending -= 1;
   // Once every change is saved, take the server's list (late flags, waiting times) quietly.
@@ -849,7 +857,7 @@ async function setStatus(id, to, { quiet = false, restore = null } = {}) {
 
 // The 60-second refresh must not fail silently: say since when the list is old, and why.
 async function backgroundRefresh() {
-  if (document.hidden) return;
+  if (document.hidden || pending) return; // a save under way refreshes when it is done
   try {
     await loadInbox();
   } catch (error) {
