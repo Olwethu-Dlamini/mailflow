@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -289,3 +291,16 @@ def test_security_headers_on_every_response(world):
         assert "frame-ancestors 'none'" in headers["content-security-policy"]
         assert headers["x-content-type-options"] == "nosniff"
     assert client.get("/api/inbox").headers["cache-control"] == "no-store"
+
+
+def test_pages_link_stamped_static_files_that_are_kept_for_a_year(world):
+    client, _, _ = world
+    page = client.get("/login")
+    assert page.headers["cache-control"] == "no-cache"
+    stamped = re.findall(r'(?:href|src)="(/static/[^"]+)"', page.text)
+    assert stamped and all("?v=" in url for url in stamped)
+    for url in stamped:
+        response = client.get(url)
+        assert response.status_code == 200
+        assert response.headers["cache-control"] == "public, max-age=31536000, immutable"
+    assert client.get("/static/app.css").headers["cache-control"] == "no-cache"

@@ -3,7 +3,9 @@
 Run: uvicorn --factory mailflow.web:main_app
 """
 
+import hashlib
 import logging
+import re
 import secrets
 import time
 from contextlib import asynccontextmanager
@@ -11,7 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, Request
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -28,6 +30,7 @@ GOOGLE_COOKIE = "mf_oauth"  # the state of a Google sign-in in progress, for thi
 REPLY_MAILBOXES = ["gmail"]  # MailFlow · Reply sends through the Gmail node only
 MAX_REPLY = 20_000
 MAX_BODY = 64 * 1024  # bytes; a reply is at most MAX_REPLY characters
+YEAR = "public, max-age=31536000, immutable"
 CSP = (
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
     "connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'"
@@ -80,6 +83,20 @@ def _user_json(user: User) -> dict:
     return {
         "id": user.id, "email": user.email, "name": user.name, "is_admin": user.is_admin, "active": user.active,
         "google_linked": user.google_sub is not None, "google_only": user.google_only,
+    }
+
+
+def _pages() -> dict[str, str]:
+    """The two HTML pages with every /static/ link stamped with a hash of the static files.
+
+    A stamped file never changes under its address, so browsers (and Cloudflare) keep it for a year
+    and a repeat visit loads no CSS or JS at all; a deploy changes the hash, so nobody runs old code.
+    """
+    files = sorted(p for p in STATIC.iterdir() if p.is_file() and p.suffix != ".html")
+    version = hashlib.sha256(b"".join(p.name.encode() + p.read_bytes() for p in files)).hexdigest()[:12]
+    return {
+        name: re.sub(r'((?:href|src)="/static/[^"?]+)"', rf'\1?v={version}"', (STATIC / name).read_text())
+        for name in ("index.html", "login.html")
     }
 
 
@@ -144,8 +161,10 @@ def create_app(
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         if request.url.path.startswith(("/api/", "/auth/")):
             response.headers["Cache-Control"] = "no-store"
+        elif request.url.path.startswith("/static/") and "v" in request.query_params:
+            response.headers["Cache-Control"] = YEAR
         elif request.url.path.startswith("/static/") or request.url.path in ("/", "/login"):
-            # Re-check with the server on every load (a cheap 304), so a deploy reaches everyone at once.
+            # The pages and unstamped files: re-check with the server on every load.
             response.headers["Cache-Control"] = "no-cache"
         return response
 
@@ -175,15 +194,17 @@ def create_app(
     def healthz():
         return {"ok": True}
 
+    pages = _pages()
+
     @app.get("/")
     def index(request: Request):
         if auth.session_user(store, request.cookies.get(COOKIE, ""), clock()) is None:
             return RedirectResponse("/login", 303)
-        return FileResponse(STATIC / "index.html")
+        return HTMLResponse(pages["index.html"])
 
     @app.get("/login")
     def login_page():
-        return FileResponse(STATIC / "login.html")
+        return HTMLResponse(pages["login.html"])
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
