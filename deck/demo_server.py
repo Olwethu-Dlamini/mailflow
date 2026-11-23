@@ -1,22 +1,29 @@
-"""The real MailFlow web app with made-up hackathon emails, for the deck screenshots.
+"""The real MailFlow web app with made-up hackathon emails, for the deck screenshots and speed tests.
 
-No n8n, no real mail: a stand-in engine serves the rows below. Replies and status changes work in
-memory only.
+No n8n, no real mail: the app's own Engine talks to a stand-in for n8n's data-table API and the
+Reply webhook, so caching and every request path are the ones that run in production. Replies and
+status changes work in memory only.
 
 Run:   cd app && uv run python ../deck/demo_server.py      (then open http://127.0.0.1:8780)
+       DEMO_N8N_MS=800 …   makes each call to the stand-in n8n take 800 ms, like the real one
 Login: demo@mailflow.example / demo-password-123
 (The Google button shows, but leads to Google's error page: the demo has no real Google client.)
 """
 
+import asyncio
+import json
+import os
 import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import httpx
 import uvicorn
 
 from mailflow import auth, web
 from mailflow.config import Settings
 from mailflow.google import GoogleLogin
+from mailflow.n8n import Engine
 from mailflow.store import Store
 from mailflow.web import create_app
 
@@ -95,19 +102,32 @@ ROWS = [
 ]
 
 
-class DemoEngine:
-    async def recent_rows(self):
-        return ROWS
+def _matches(row: dict, filter_json: str | None) -> bool:
+    for f in json.loads(filter_json)["filters"] if filter_json else []:
+        value = row.get(f["columnName"])
+        if f["condition"] == "eq" and value != f["value"]:
+            return False
+        if f["condition"] == "gte" and str(value) < str(f["value"]):
+            return False
+    return True
 
-    async def get_row(self, row_id):
-        return next((r for r in ROWS if r["id"] == row_id), None)
 
-    async def set_status(self, row_id, to):
-        next(r for r in ROWS if r["id"] == row_id)["status"] = to
-
-    async def send_reply(self, message_id, text):
+async def fake_n8n(request: httpx.Request) -> httpx.Response:
+    """Just enough of n8n's data-table API and the Reply webhook for the app, with n8n's slowness."""
+    await asyncio.sleep(int(os.environ.get("DEMO_N8N_MS", "0")) / 1000)
+    if request.url.path.endswith("/webhook/mailflow/reply"):
+        message_id = json.loads(request.content)["id"]
         next(r for r in ROWS if r["message_id"] == message_id)["status"] = "waiting"
-        return "sent"
+        return httpx.Response(200, json={"result": "sent"})
+    if request.method == "PATCH":
+        body = json.loads(request.content)
+        for row in ROWS:
+            if _matches(row, json.dumps(body["filter"])):
+                row.update(body["data"])
+        return httpx.Response(200, json=True)
+    found = [r for r in ROWS if _matches(r, request.url.params.get("filter"))]
+    found.sort(key=lambda r: r["received_at"], reverse=True)
+    return httpx.Response(200, json={"data": found[: int(request.url.params.get("limit", "250"))], "nextCursor": None})
 
 
 def main() -> None:
@@ -117,11 +137,12 @@ def main() -> None:
     store.add_user("demo@mailflow.example", "Olwethu Dlamini", auth.hash_password("demo-password-123"), is_admin=True)
     store.add_user("thabo@mailflow.example", "Thabo Nkosi", auth.hash_password("demo-password-123"), is_admin=False)
     settings = Settings(
-        n8n_url="http://demo", n8n_api_key="demo", table_id="demo", reply_url="http://demo", reply_secret="demo",
-        db_path=str(db), cookie_secure=False, trusted_proxy="", site_origin="http://127.0.0.1:8780",
+        n8n_url="http://demo", n8n_api_key="demo", table_id="demo", reply_url="http://demo/webhook/mailflow/reply",
+        reply_secret="demo", db_path=str(db), cookie_secure=False, trusted_proxy="", site_origin="http://127.0.0.1:8780",
         google_client_id="demo.apps.googleusercontent.com", google_client_secret="demo",
     )
-    app = create_app(settings, DemoEngine(), store, google=GoogleLogin(settings))
+    engine = Engine(settings, transport=httpx.MockTransport(fake_n8n))
+    app = create_app(settings, engine, store, google=GoogleLogin(settings))
     uvicorn.run(app, host="127.0.0.1", port=8780, log_level="warning")
 
 
