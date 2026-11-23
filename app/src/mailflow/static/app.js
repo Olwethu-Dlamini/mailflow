@@ -231,7 +231,13 @@ function loadOtherViews() {
     const q = new URLSearchParams({ view, mailbox: s.mailbox, topic: s.topic, sender: s.sender });
     const seen = statusChanges;
     api(`/api/inbox?${q}`).then((data) => {
-      if (seen === statusChanges) lists.set(key, data);
+      // Changes made since it was asked for may be missing from it: make them again (moving rows
+      // is safe to repeat; the counts, the same for every list, come from the list on screen).
+      if (seen !== statusChanges) {
+        for (const change of recentChanges.filter((c) => c.n > seen)) placeRow(key, data, change.now);
+        data.counts = { ...inbox.counts };
+      }
+      if (!lists.has(key)) lists.set(key, data);
     }, () => {});
   }
 }
@@ -750,6 +756,20 @@ const IN_VIEW = {
   done: (item) => item.status === "done",
   all: () => true,
 };
+// And its order (queue.py build): the working views P1 to P3 then oldest first, Done and
+// Everything newest first. received_at is ISO 8601 in one format, so text order is time order.
+const RANK = { P1: 0, P2: 1, P3: 2 };
+function comesBefore(view, a, b) {
+  if (view === "done" || view === "all") return a.received_at > b.received_at;
+  const ra = RANK[a.priority] ?? 3;
+  const rb = RANK[b.priority] ?? 3;
+  return ra !== rb ? ra < rb : a.received_at < b.received_at;
+}
+// A kept list's filters, from its key (view, mailbox, topic, sender).
+function passesFilters(key, item) {
+  const [, mailbox, topic, sender] = key.split("\u0000");
+  return (!mailbox || item.mailbox === mailbox) && (!topic || item.type === topic) && (!sender || item.sender === sender);
+}
 let undo = null; // the last status change, while its toast is up
 function runUndo() {
   const u = undo;
@@ -760,48 +780,50 @@ function runUndo() {
   }
 }
 
-// Change the lists on the page now: the status, the counts, and the row leaving a view it no longer
-// belongs to, in the list on screen and every remembered one (a remembered list the email now
-// joins is dropped: only the server knows where the row goes). `restore` puts a row that left the
-// list on screen back where it was (Undo). Returns that row and its place.
-function applyLocally(id, to, restore = null) {
-  const listed = inbox?.items.find((item) => item.id === id) || restore?.item;
+// Change the lists on the page now, the one on screen and every kept one: the status, the counts,
+// and the row leaving a view it no longer belongs to or joining one it now belongs to, in the
+// server's order. `known` is the email as last seen, for one no longer on screen (Undo).
+// Returns the email after the change.
+function applyLocally(id, to, known = null) {
+  const listed = inbox?.items.find((item) => item.id === id) || known;
   if (!listed) return null;
   const was = { ...listed };
   const now = { ...listed, status: to, ...(to === "open" ? {} : { waiting: "", late: false }) };
-  let change = null;
   for (const [key, list] of new Map([...lists, [listKey(state()), inbox]])) {
     for (const [view, inView] of Object.entries(IN_VIEW)) list.counts[view] += (inView(now) ? 1 : 0) - (inView(was) ? 1 : 0);
-    let at = list.items.findIndex((item) => item.id === id);
-    // By view and filters, not by object: a refresh since the change replaced the list.
-    if (at < 0 && restore?.key === key) {
-      at = Math.min(restore.at, list.items.length);
-      list.items.splice(at, 0, restore.item);
-    }
-    if (at >= 0) {
-      Object.assign(list.items[at], { status: now.status, waiting: now.waiting, late: now.late });
-      if (list === inbox) change = { item: list.items[at], at, key };
-      if (!(IN_VIEW[list.view] || IN_VIEW.all)(now)) list.items.splice(at, 1);
-    } else if ((IN_VIEW[list.view] || IN_VIEW.all)(now)) {
-      lists.delete(key);
-    }
+    placeRow(key, list, now);
   }
-  return change;
+  recentChanges.push({ n: statusChanges + 1, now });
+  if (recentChanges.length > 50) recentChanges.shift();
+  return now;
 }
+
+// Put one email where it now belongs in one list: updated, gone, or inserted in order.
+function placeRow(key, list, now) {
+  const at = list.items.findIndex((item) => item.id === now.id);
+  const belongs = (IN_VIEW[list.view] || IN_VIEW.all)(now) && passesFilters(key, now);
+  if (at >= 0 && belongs) Object.assign(list.items[at], { status: now.status, waiting: now.waiting, late: now.late });
+  else if (at >= 0) list.items.splice(at, 1);
+  else if (belongs) {
+    const place = list.items.findIndex((other) => comesBefore(list.view, now, other));
+    list.items.splice(place < 0 ? list.items.length : place, 0, { ...now });
+  }
+}
+const recentChanges = []; // the last changes made here, for lists that were on their way meanwhile
 
 // Change an email's status. The page changes at once (as Superhuman and Front do): the email leaves
 // the view, the next one opens, and Undo is offered. The server is told in the background; if it
 // refuses, the list is loaded again so the page shows the truth.
 let pending = 0;
 const saving = new Map(); // email id → its last save, which the next one waits for
-async function setStatus(id, to, { quiet = false, restore = null } = {}) {
-  const listed = inbox?.items.find((item) => item.id === id) || restore?.item;
+async function setStatus(id, to, { quiet = false, known = null } = {}) {
+  const listed = inbox?.items.find((item) => item.id === id) || known;
   const before = listed?.status ?? (openEmail?.id === id ? openEmail.status : undefined);
   const wasOpen = state().id === String(id);
   const leaves = Boolean(listed && inbox) && !(IN_VIEW[inbox.view] || IN_VIEW.all)({ ...listed, status: to });
   const next = wasOpen && leaves ? neighbour(1) || neighbour(-1) || "" : null;
 
-  const change = applyLocally(id, to, restore);
+  const change = applyLocally(id, to, known);
   setCachedStatus(id, to);
   if (openEmail?.id === id) openEmail.status = to;
   inboxToken += 1; // a list already on its way predates this change: drop it
@@ -821,7 +843,7 @@ async function setStatus(id, to, { quiet = false, restore = null } = {}) {
     toast(`Back to ${STATUS_TEXT[to]}.`);
   } else if (before && before !== to) {
     undo = () => {
-      setStatus(id, before, { quiet: true, restore: change });
+      setStatus(id, before, { quiet: true, known: change });
       go({ id: String(id) });
     };
     toast(`Marked ${STATUS_TEXT[to]}.`, false, ["Undo", runUndo]);
@@ -903,7 +925,7 @@ function showInbox(data, { remembered = false } = {}) {
   } else {
     staleDelay = 2000;
   }
-  if (!data.stale) setTimeout(loadOtherViews, 300);
+  setTimeout(loadOtherViews, 300);
 }
 
 // A failed load keeps the list already on screen (flagged as not refreshed); with nothing to keep
