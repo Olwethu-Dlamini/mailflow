@@ -82,6 +82,14 @@ function el(tag, props = {}, ...children) {
   return node;
 }
 
+// Run a page change as a short cross-fade where rows slide into place (View Transitions); as is
+// where the browser has none or the reader asked for less motion.
+const calm = matchMedia("(prefers-reduced-motion: reduce)");
+function smoothly(update) {
+  if (!document.startViewTransition || calm.matches || document.hidden) return update();
+  document.startViewTransition(update);
+}
+
 function icon(name, cls = "icon") {
   const svg = document.createElementNS(SVG, "svg");
   for (const [key, value] of Object.entries({
@@ -619,12 +627,14 @@ async function renderDetail() {
   const token = ++detailToken;
   const listed = inbox?.items.find((item) => String(item.id) === s.id);
   const keepDraft = detail.dataset.id === s.id ? detail.querySelector("textarea")?.value || "" : "";
+  const fresh = detail.dataset.id !== s.id; // another email: it eases in; the same one is redrawn still
   // Not fetched yet: show what the list already knows (all but the text) straight away, and
   // let E/W/U act on it; the text follows.
-  if (!fetched.has(s.id) && detail.dataset.id !== s.id) {
+  const preview = !fetched.has(s.id) && fresh;
+  if (preview) {
     openEmail = listed ? { ...listed, can_reply: inbox.reply_mailboxes.includes(listed.mailbox) } : null;
     detail.dataset.id = listed ? s.id : "";
-    detail.replaceChildren(...(listed ? emailView(listed, { loading: true }) : [detailBar(null), placeholder("inbox", "Opening…")]));
+    detail.replaceChildren(...(listed ? emailView(listed, { loading: true, enter: true }) : [detailBar(null), placeholder("inbox", "Opening…")]));
   }
   let email;
   try {
@@ -640,7 +650,7 @@ async function renderDetail() {
   if (listed) email.status = listed.status;
   detail.dataset.id = s.id;
   openEmail = email;
-  detail.replaceChildren(...emailView(email, { draft: keepDraft }));
+  detail.replaceChildren(...emailView(email, { draft: keepDraft, enter: fresh && !(preview && listed) }));
   // J and K (and E, which opens the next one) will want these.
   prefetch(neighbour(1));
   prefetch(neighbour(-1));
@@ -648,7 +658,7 @@ async function renderDetail() {
 
 // The open email: the action bar, then subject and labels, the AI card, the message and the reply
 // box. `loading`: the text is on its way, so grey lines stand in for it and there is no reply box yet.
-function emailView(email, { loading = false, draft = "" } = {}) {
+function emailView(email, { loading = false, draft = "", enter = false } = {}) {
   const name = email.from_name || email.from_address || "";
   const unsorted = email.sorted_by === "unsorted";
   const text = loading
@@ -658,7 +668,7 @@ function emailView(email, { loading = false, draft = "" } = {}) {
       : el("div", { class: "body none", text: "This email has no text." });
   return [
     detailBar(email),
-    el("article", { class: "detail-body" },
+    el("article", { class: enter ? "detail-body enter" : "detail-body" },
       el("h1", { class: "detail-subject", text: email.subject || "(no subject)" }),
       el("div", { class: "chips detail-tags" },
         email.priority ? el("span", { class: `prio ${email.priority}`, text: email.priority }) : null,
@@ -794,12 +804,16 @@ async function setStatus(id, to, { quiet = false, restore = null } = {}) {
   if (openEmail?.id === id) openEmail.status = to;
   inboxToken += 1; // a list already on its way predates this change: drop it
   statusChanges += 1; // likewise the other views being loaded ahead
-  if (inbox) {
-    renderSidebar();
-    renderList();
-  }
-  if (next !== null) go({ id: next });
-  else if (wasOpen) renderDetail();
+  // The row leaves and the next email opens as one short animation (the next email shows from
+  // what the list knows, synchronously, so the animation never waits for the network).
+  smoothly(() => {
+    if (inbox) {
+      renderSidebar();
+      renderList();
+    }
+    if (next !== null) go({ id: next });
+    else if (wasOpen) renderDetail();
+  });
 
   if (quiet) {
     toast(`Back to ${STATUS_TEXT[to]}.`);

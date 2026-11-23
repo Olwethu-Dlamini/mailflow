@@ -121,7 +121,7 @@ kbd { display: inline-block; min-width: 18px; padding: 2px 5px; border: 1px soli
 
 /* the app: sidebar | list | email */
 body.app { flex-direction: row; background: var(--canvas); }
-.sidebar { flex: none; width: 244px; display: flex; flex-direction: column; gap: 10px; padding: 12px 10px 10px; background: var(--canvas); border-right: 1px solid var(--line); overflow-y: auto; }
+.sidebar { flex: none; width: 244px; display: flex; flex-direction: column; gap: 10px; padding: 12px 10px 10px; background: var(--canvas); border-right: 1px solid var(--line); overflow-y: auto; transition: width .16s ease, padding .16s ease; }
 .side-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 34px; padding: 0 2px 0 6px; }
 .search { display: flex; align-items: center; gap: 8px; height: 34px; margin: 4px 0 6px; padding: 0 6px 0 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); color: var(--faint); cursor: text; }
 .search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -252,7 +252,17 @@ body.app { flex-direction: row; background: var(--canvas); }
 .skeleton .lines i { height: 10px; }
 .skeleton .w40 { width: 40%; } .skeleton .w85 { width: 85%; } .skeleton .w65 { width: 65%; }
 @keyframes pulse { from { opacity: 1; } to { opacity: .45; } }
-@media (prefers-reduced-motion: reduce) { .skeleton i { animation: none; } }
+
+/* motion: short, and none for readers who asked for less */
+.item, .nav-item, .btn, .icon-btn, .pick, .pill-x, .user-btn, .sync, .menu button { transition: background-color .12s ease, color .12s ease, border-color .12s ease, box-shadow .12s ease; }
+.detail-body.enter { animation: rise-in .16s ease-out; }
+@keyframes rise-in { from { opacity: 0; transform: translateY(4px); } }
+.toast:not([hidden]) { animation: toast-in .18s ease-out; }
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation-duration: .16s; animation-timing-function: ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
 
 /* chips and badges */
 .chips { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
