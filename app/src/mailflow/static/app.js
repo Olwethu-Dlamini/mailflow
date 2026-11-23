@@ -186,16 +186,46 @@ function urlFor(changes) {
 const LIST_KEYS = ["view", "mailbox", "topic", "sender"];
 let shown = null;
 
+// The lists already loaded, by view and filters: switching back to one shows it at once while a
+// fresh copy loads. Any status change empties it (it moves emails between views).
+const lists = new Map();
+const listKey = (s) => LIST_KEYS.map((key) => s[key]).join("\u0000");
+
 // Bring the page in line with the address bar. Only a new view or filter asks the server for the
 // list again; opening another email or searching works on the list already loaded.
 function show() {
   const s = state();
   const before = shown;
   shown = s;
-  if (!inbox || !before || LIST_KEYS.some((key) => s[key] !== before[key])) return render();
+  if (!inbox || !before || LIST_KEYS.some((key) => s[key] !== before[key])) {
+    const known = lists.get(listKey(s));
+    if (!known) {
+      // Not the old view's rows under the new view's name while it loads.
+      if (inbox) $("list").replaceChildren(...listSkeleton());
+      return render();
+    }
+    showInbox(known, { remembered: true });
+    backgroundRefresh();
+    return renderDetail();
+  }
   if (s.q !== before.q) renderList();
   else markSelected();
   return renderDetail();
+}
+
+// Load the working views for the same filters in the background, so switching to them is instant
+// (Done and Everything can be long, so they load when asked for).
+function loadOtherViews() {
+  const s = state();
+  for (const view of ["reply", "p1", "waiting"]) {
+    const key = listKey({ ...s, view });
+    if (lists.has(key)) continue;
+    const q = new URLSearchParams({ view, mailbox: s.mailbox, topic: s.topic, sender: s.sender });
+    const seen = statusChanges;
+    api(`/api/inbox?${q}`).then((data) => {
+      if (seen === statusChanges) lists.set(key, data);
+    }, () => {});
+  }
 }
 
 function go(changes) {
@@ -676,23 +706,32 @@ function runUndo() {
   }
 }
 
-// Change the list on screen now: the status, the counts, and the row leaving a view it no longer
-// belongs to. `restore` puts a row that left back where it was (Undo). Returns that row and place.
+// Change the lists on the page now: the status, the counts, and the row leaving a view it no longer
+// belongs to, in the list on screen and every remembered one (a remembered list the email now
+// joins is dropped: only the server knows where the row goes). `restore` puts a row that left the
+// list on screen back where it was (Undo). Returns that row and its place.
 function applyLocally(id, to, restore = null) {
-  if (!inbox) return null;
-  let at = inbox.items.findIndex((item) => item.id === id);
-  if (at < 0 && restore) {
-    at = Math.min(restore.at, inbox.items.length);
-    inbox.items.splice(at, 0, restore.item);
+  const listed = inbox?.items.find((item) => item.id === id) || restore?.item;
+  if (!listed) return null;
+  const was = { ...listed };
+  const now = { ...listed, status: to, ...(to === "open" ? {} : { waiting: "", late: false }) };
+  let change = null;
+  for (const [key, list] of new Map([...lists, [listKey(state()), inbox]])) {
+    for (const [view, inView] of Object.entries(IN_VIEW)) list.counts[view] += (inView(now) ? 1 : 0) - (inView(was) ? 1 : 0);
+    let at = list.items.findIndex((item) => item.id === id);
+    if (at < 0 && restore?.list === list) {
+      at = Math.min(restore.at, list.items.length);
+      list.items.splice(at, 0, restore.item);
+    }
+    if (at >= 0) {
+      Object.assign(list.items[at], { status: now.status, waiting: now.waiting, late: now.late });
+      if (list === inbox) change = { item: list.items[at], at, list };
+      if (!(IN_VIEW[list.view] || IN_VIEW.all)(now)) list.items.splice(at, 1);
+    } else if ((IN_VIEW[list.view] || IN_VIEW.all)(now)) {
+      lists.delete(key);
+    }
   }
-  const item = inbox.items[at];
-  if (!item) return null;
-  for (const [view, inView] of Object.entries(IN_VIEW)) if (inView(item)) inbox.counts[view] -= 1;
-  item.status = to;
-  if (to !== "open") Object.assign(item, { waiting: "", late: false });
-  for (const [view, inView] of Object.entries(IN_VIEW)) if (inView(item)) inbox.counts[view] += 1;
-  if (!(IN_VIEW[inbox.view] || IN_VIEW.all)(item)) inbox.items.splice(at, 1);
-  return { item, at };
+  return change;
 }
 
 // Change an email's status. The page changes at once (as Superhuman and Front do): the email leaves
@@ -710,6 +749,7 @@ async function setStatus(id, to, { quiet = false, restore = null } = {}) {
   setCachedStatus(id, to);
   if (openEmail?.id === id) openEmail.status = to;
   inboxToken += 1; // a list already on its way predates this change: drop it
+  statusChanges += 1; // likewise the other views being loaded ahead
   if (inbox) {
     renderSidebar();
     renderList();
@@ -741,7 +781,10 @@ async function setStatus(id, to, { quiet = false, restore = null } = {}) {
   }
   pending -= 1;
   // Once every change is saved, take the server's list (late flags, waiting times) quietly.
-  if (pending === 0) backgroundRefresh();
+  if (pending === 0) {
+    backgroundRefresh();
+    loadOtherViews();
+  }
 }
 
 // --- loading ------------------------------------------------------------------
@@ -760,6 +803,7 @@ async function backgroundRefresh() {
 // Each load gets a number; an answer that arrives after a newer load started is dropped, so a
 // click during a slow load is never lost and an old answer never overwrites a newer one.
 let inboxToken = 0;
+let statusChanges = 0; // made on this page; a list asked for before one is out of date
 let staleTimer = null;
 let wasStale = false;
 async function loadInbox() {
@@ -771,18 +815,23 @@ async function loadInbox() {
   showInbox(data);
 }
 
-function showInbox(data) {
+function showInbox(data, { remembered = false } = {}) {
   inbox = data;
-  loadedAt = new Date();
-  syncError = "";
+  lists.set(listKey(state()), data);
+  if (!remembered) {
+    loadedAt = new Date();
+    syncError = "";
+  }
   renderSync();
   renderSidebar();
   renderList();
   if (!state().id) prefetch(neighbour(1)); // what J would open first
+  if (remembered) return;
   // The server sent the list it had while it reads a fresh one from n8n: ask again shortly, once.
   clearTimeout(staleTimer);
   if (data.stale && !wasStale) staleTimer = setTimeout(backgroundRefresh, 2000);
   wasStale = data.stale;
+  if (!data.stale) setTimeout(loadOtherViews, 300);
 }
 
 // A failed load keeps the list already on screen (flagged as not refreshed); with nothing to keep
