@@ -9,16 +9,16 @@
   --line-strong: #dadae2;
   --text: #17171f;
   --text-2: #3c3c4a;
-  --muted: #6c6c7c;
-  --faint: #9e9eac;
+  --muted: #545465;
+  --faint: #6c6c7c; /* the lightest text: still 4.5:1 on every background it sits on */
   --accent: #5b5bd6;
   --accent-hover: #4a4ac4;
   --accent-soft: #efeffd;
   --accent-fg: #ffffff;
   --neutral-soft: #f0f0f3;
-  --red: #cf3439;
+  --red: #b42a30;
   --red-soft: #fdeeee;
-  --amber: #b25b00;
+  --amber: #9a4f00;
   --amber-soft: #fff3e0;
   --green: #18794e;
   --green-soft: #e8f5ee;
@@ -28,7 +28,7 @@
   --violet-soft: #f3eefc;
   --pink: #c0267a;
   --pink-soft: #fceef6;
-  --teal: #0b7c86;
+  --teal: #0a6e77;
   --teal-soft: #e6f6f7;
   --toast: #17171f;
   --toast-fg: #ffffff;
@@ -52,8 +52,8 @@
     --line-strong: #35363f;
     --text: #ececf1;
     --text-2: #c5c6d0;
-    --muted: #8f909d;
-    --faint: #646572;
+    --muted: #a3a4b0;
+    --faint: #8f909d;
     --accent: #8d8ef9;
     --accent-hover: #a2a3fb;
     --accent-soft: rgba(141, 142, 249, .15);
@@ -390,7 +390,7 @@ table.users tr.disabled .person { opacity: .55; }
 .pitch-preview {
   margin-bottom: auto; max-width: 440px; padding: 6px; border-radius: 14px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 30px 60px rgba(8, 6, 40, .45);
   /* the picture is always light, whatever the theme */
-  --red: #cf3439; --red-soft: #fdeeee; --amber: #b25b00; --amber-soft: #fff3e0; --green: #18794e; --green-soft: #e8f5ee;
+  --red: #b42a30; --red-soft: #fdeeee; --amber: #9a4f00; --amber-soft: #fff3e0; --green: #18794e; --green-soft: #e8f5ee;
   --pink: #c0267a; --pink-soft: #fceef6; --violet: #7445c8; --violet-soft: #f3eefc;
 }
 .pv-row { display: flex; gap: 10px; align-items: center; padding: 11px 12px; border-radius: 9px; background: rgba(255, 255, 255, .96); color: #17171f; }
