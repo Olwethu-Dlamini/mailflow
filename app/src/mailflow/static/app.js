@@ -642,8 +642,15 @@ function replyBox(email, draft) {
   return form;
 }
 
-// Does an email with this status still belong in the view on screen?
-const STAYS = { reply: (to) => to === "open", p1: (to) => to !== "done", waiting: (to) => to === "waiting", done: (to) => to === "done", all: () => true };
+// Which views an email belongs to: the server's rules (queue.py IN_VIEW), so the page can move an
+// email at once instead of waiting for the server.
+const IN_VIEW = {
+  reply: (item) => item.needs_reply && item.status === "open",
+  p1: (item) => item.priority === "P1" && item.status !== "done",
+  waiting: (item) => item.status === "waiting",
+  done: (item) => item.status === "done",
+  all: () => true,
+};
 let undo = null; // the last status change, while its toast is up
 function runUndo() {
   const u = undo;
@@ -654,30 +661,72 @@ function runUndo() {
   }
 }
 
-// Change an email's status. When that takes it out of the view, open the next one (as Superhuman
-// and Front do), and offer Undo, which puts the status back and reopens the email.
-async function setStatus(id, to, { quiet = false } = {}) {
-  const before = openEmail && String(openEmail.id) === String(id) ? openEmail.status : inbox?.items.find((item) => item.id === id)?.status;
-  const wasOpen = state().id === String(id);
-  const leaves = inbox && !(STAYS[inbox.view] || STAYS.all)(to);
-  const next = wasOpen && leaves ? neighbour(1) || neighbour(-1) || "" : null;
-  try {
-    await api(`/api/emails/${id}/status`, { method: "POST", body: { to } });
-    setCachedStatus(id, to);
-  } catch (error) {
-    toast(error.message, true);
-    return;
+// Change the list on screen now: the status, the counts, and the row leaving a view it no longer
+// belongs to. `restore` puts a row that left back where it was (Undo). Returns that row and place.
+function applyLocally(id, to, restore = null) {
+  if (!inbox) return null;
+  let at = inbox.items.findIndex((item) => item.id === id);
+  if (at < 0 && restore) {
+    at = Math.min(restore.at, inbox.items.length);
+    inbox.items.splice(at, 0, restore.item);
   }
+  const item = inbox.items[at];
+  if (!item) return null;
+  for (const [view, inView] of Object.entries(IN_VIEW)) if (inView(item)) inbox.counts[view] -= 1;
+  item.status = to;
+  if (to !== "open") Object.assign(item, { waiting: "", late: false });
+  for (const [view, inView] of Object.entries(IN_VIEW)) if (inView(item)) inbox.counts[view] += 1;
+  if (!(IN_VIEW[inbox.view] || IN_VIEW.all)(item)) inbox.items.splice(at, 1);
+  return { item, at };
+}
+
+// Change an email's status. The page changes at once (as Superhuman and Front do): the email leaves
+// the view, the next one opens, and Undo is offered. The server is told in the background; if it
+// refuses, the list is loaded again so the page shows the truth.
+let pending = 0;
+async function setStatus(id, to, { quiet = false, restore = null } = {}) {
+  const listed = inbox?.items.find((item) => item.id === id) || restore?.item;
+  const before = listed?.status ?? (openEmail?.id === id ? openEmail.status : undefined);
+  const wasOpen = state().id === String(id);
+  const leaves = Boolean(listed && inbox) && !(IN_VIEW[inbox.view] || IN_VIEW.all)({ ...listed, status: to });
+  const next = wasOpen && leaves ? neighbour(1) || neighbour(-1) || "" : null;
+
+  const change = applyLocally(id, to, restore);
+  setCachedStatus(id, to);
+  if (openEmail?.id === id) openEmail.status = to;
+  inboxToken += 1; // a list already on its way predates this change: drop it
+  if (inbox) {
+    renderSidebar();
+    renderList();
+  }
+  if (next !== null) go({ id: next });
+  else if (wasOpen) renderDetail();
+
   if (quiet) {
     toast(`Back to ${STATUS_TEXT[to]}.`);
   } else if (before && before !== to) {
-    undo = () => setStatus(id, before, { quiet: true }).then(() => go({ id: String(id) }));
+    undo = () => {
+      setStatus(id, before, { quiet: true, restore: change });
+      go({ id: String(id) });
+    };
     toast(`Marked ${STATUS_TEXT[to]}.`, false, ["Undo", runUndo]);
   } else {
     toast(`Marked ${STATUS_TEXT[to]}.`);
   }
-  if (next !== null) go({ id: next });
-  else await render();
+
+  pending += 1;
+  try {
+    await api(`/api/emails/${id}/status`, { method: "POST", body: { to } });
+  } catch (error) {
+    pending -= 1;
+    toast(`Not saved: ${error.message}`, true);
+    emails.delete(String(id));
+    await render();
+    return;
+  }
+  pending -= 1;
+  // Once every change is saved, take the server's list (late flags, waiting times) quietly.
+  if (pending === 0) backgroundRefresh();
 }
 
 // --- loading ------------------------------------------------------------------
