@@ -773,13 +773,14 @@ function applyLocally(id, to, restore = null) {
   for (const [key, list] of new Map([...lists, [listKey(state()), inbox]])) {
     for (const [view, inView] of Object.entries(IN_VIEW)) list.counts[view] += (inView(now) ? 1 : 0) - (inView(was) ? 1 : 0);
     let at = list.items.findIndex((item) => item.id === id);
-    if (at < 0 && restore?.list === list) {
+    // By view and filters, not by object: a refresh since the change replaced the list.
+    if (at < 0 && restore?.key === key) {
       at = Math.min(restore.at, list.items.length);
       list.items.splice(at, 0, restore.item);
     }
     if (at >= 0) {
       Object.assign(list.items[at], { status: now.status, waiting: now.waiting, late: now.late });
-      if (list === inbox) change = { item: list.items[at], at, list };
+      if (list === inbox) change = { item: list.items[at], at, key };
       if (!(IN_VIEW[list.view] || IN_VIEW.all)(now)) list.items.splice(at, 1);
     } else if ((IN_VIEW[list.view] || IN_VIEW.all)(now)) {
       lists.delete(key);
