@@ -160,12 +160,13 @@ def create_app(
         response.headers["X-Frame-Options"] = "DENY"
         if settings.cookie_secure:
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
-        if request.url.path.startswith(("/api/", "/auth/")):
+        # The queue page carries the account, the list and an email's text: never stored, like the API.
+        if request.url.path.startswith(("/api/", "/auth/")) or request.url.path == "/":
             response.headers["Cache-Control"] = "no-store"
         elif request.url.path.startswith("/static/") and "v" in request.query_params:
             response.headers["Cache-Control"] = YEAR
-        elif request.url.path.startswith("/static/") or request.url.path in ("/", "/login"):
-            # The pages and unstamped files: re-check with the server on every load.
+        elif request.url.path.startswith("/static/") or request.url.path == "/login":
+            # The sign-in page and unstamped files: re-check with the server on every load.
             response.headers["Cache-Control"] = "no-cache"
         return response
 

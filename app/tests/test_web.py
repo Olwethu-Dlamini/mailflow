@@ -320,7 +320,9 @@ def boot_data(page: str) -> dict:
 def test_the_page_carries_the_account_list_and_open_email_with_email_text_kept_inert(world):
     client, _, _ = world
     login(client)
-    page = client.get("/?view=all&id=1").text
+    response = client.get("/?view=all&id=1")
+    page = response.text
+    assert response.headers["cache-control"] == "no-store"  # it holds an email's text
     boot = boot_data(page)
     assert boot["me"]["email"] == "staff@example.com"
     assert [item["id"] for item in boot["inbox"]["items"]] == [2, 1]
