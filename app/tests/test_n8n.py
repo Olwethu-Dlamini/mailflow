@@ -178,7 +178,7 @@ async def test_a_status_change_or_a_sent_reply_updates_the_cached_list_in_place(
     e = engine(handler)
     await e.recent_rows()
     await e.set_status(1, "done")
-    assert await e.send_reply("<b@x>", "Thanks") == "sent"
+    assert await e.send_reply(2, "<b@x>", "Thanks") == "sent"
     rows = await e.recent_rows()
     assert [r["status"] for r in rows] == ["done", "waiting"]
     assert (await e.get_row(1))["status"] == "done"
@@ -232,7 +232,7 @@ async def test_send_reply_posts_to_the_webhook_with_the_secret():
         sent.append(request)
         return httpx.Response(200, json={"result": "sent"})
 
-    assert await engine(handler).send_reply("<abc@x>", "Thanks!") == "sent"
+    assert await engine(handler).send_reply(9, "<abc@x>", "Thanks!") == "sent"
     assert str(sent[0].url) == "http://n8n:5678/webhook/mailflow/reply"
     assert sent[0].headers["X-MailFlow-Secret"] == "reply-secret"
     assert json.loads(sent[0].content) == {"id": "<abc@x>", "text": "Thanks!"}
@@ -240,6 +240,23 @@ async def test_send_reply_posts_to_the_webhook_with_the_secret():
 
 async def test_send_reply_refused_or_odd_answer_raises_engine_down():
     with pytest.raises(EngineDown):
-        await engine(lambda request: httpx.Response(403, text="Authorization data is wrong!")).send_reply("<a>", "x")
+        await engine(lambda request: httpx.Response(403, text="Authorization data is wrong!")).send_reply(1, "<a>", "x")
     with pytest.raises(EngineDown):
-        await engine(lambda request: httpx.Response(200, json={"result": "maybe"})).send_reply("<a>", "x")
+        await engine(lambda request: httpx.Response(200, json={"result": "maybe"})).send_reply(1, "<a>", "x")
+
+
+async def test_a_reply_sent_while_the_first_read_is_under_way_is_not_lost():
+    release = asyncio.Event()
+
+    async def handler(request):
+        if "webhook" in request.url.path:
+            return httpx.Response(200, json={"result": "sent"})
+        await release.wait()  # the start-up read began before the reply and answers late
+        return httpx.Response(200, json={"data": [{"id": 4, "status": "open"}], "nextCursor": None})
+
+    e = engine(handler)
+    e.warm()
+    await asyncio.sleep(0)
+    assert await e.send_reply(4, "<d@x>", "On it") == "sent"  # nothing in memory yet
+    release.set()
+    assert (await e.recent_rows())[0]["status"] == "waiting"

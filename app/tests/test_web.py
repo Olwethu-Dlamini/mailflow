@@ -62,7 +62,7 @@ class FakeEngine:
         self._check()
         self.statuses.append((row_id, to))
 
-    async def send_reply(self, message_id, text):
+    async def send_reply(self, row_id, message_id, text):
         self._check()
         self.replies.append((message_id, text))
         return self.reply_result

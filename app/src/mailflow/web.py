@@ -364,7 +364,7 @@ def create_app(
         row = await _row(row_id)
         if row.get("mailbox") not in REPLY_MAILBOXES:
             raise ApiError(400, f"Replies from this page work for the {', '.join(REPLY_MAILBOXES)} mailbox only.")
-        result = await engine.send_reply(row["message_id"], text)
+        result = await engine.send_reply(row_id, row["message_id"], text)
         if result == "not_found":
             raise ApiError(404, "Not sent: this email could not be found in Gmail.")
         if result == "cannot":

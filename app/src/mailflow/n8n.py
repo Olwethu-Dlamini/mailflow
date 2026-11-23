@@ -162,7 +162,7 @@ class Engine:
         self._set_cached_status(lambda row: row.get("id") == row_id, to)
         self._edits[row_id] = (to, self._clock())
 
-    async def send_reply(self, message_id: str, text: str) -> str:
+    async def send_reply(self, row_id: int, message_id: str, text: str) -> str:
         """Ask MailFlow · Reply to answer the email in Gmail. Returns 'sent', 'cannot' or 'not_found'."""
         response = await self._call(
             "POST",
@@ -177,7 +177,8 @@ class Engine:
         if result not in REPLY_RESULTS:
             raise EngineDown("the Reply workflow answered something unexpected")
         if result == "sent":  # MailFlow · Reply sets the row to waiting
-            self._set_cached_status(lambda row: row.get("message_id") == message_id, "waiting")
+            self._set_cached_status(lambda row: row.get("id") == row_id, "waiting")
+            self._edits[row_id] = ("waiting", self._clock())  # also when the row is not in memory yet
         return result
 
 
