@@ -403,6 +403,8 @@ function row(item, selected) {
     "aria-current": selected ? "true" : null,
     "data-id": String(item.id),
     onclick: () => go({ id: String(item.id) }),
+    // A pointer resting on a row fetches that email, so the click opens it at once.
+    onpointerenter: () => prefetch(String(item.id)),
   },
     avatar(name),
     el("span", { class: "item-main" },
@@ -507,6 +509,25 @@ function detailBar(email) {
     email ? statusButtons(email) : null);
 }
 
+// Emails already fetched (or on their way), by id. The text of an email never changes; its status
+// is taken from the list, which is kept current.
+const emails = new Map();
+function fetchEmail(id) {
+  if (!emails.has(id)) {
+    emails.set(id, api(`/api/emails/${encodeURIComponent(id)}`).catch((error) => {
+      emails.delete(id);
+      throw error;
+    }));
+  }
+  return emails.get(id);
+}
+function prefetch(id) {
+  if (id) fetchEmail(id).catch(() => {});
+}
+function setCachedStatus(id, to) {
+  emails.get(String(id))?.then((email) => { email.status = to; }, () => {});
+}
+
 async function renderDetail() {
   const s = state();
   const detail = $("detail");
@@ -525,7 +546,7 @@ async function renderDetail() {
   }
   let email;
   try {
-    email = await api(`/api/emails/${encodeURIComponent(s.id)}`);
+    email = await fetchEmail(s.id);
   } catch (error) {
     if (token !== detailToken) return;
     openEmail = null;
@@ -534,6 +555,8 @@ async function renderDetail() {
     return;
   }
   if (token !== detailToken) return;
+  const listed = inbox?.items.find((item) => String(item.id) === s.id);
+  if (listed) email.status = listed.status;
   const keepDraft = detail.dataset.id === s.id ? detail.querySelector("textarea")?.value || "" : "";
   detail.dataset.id = s.id;
   openEmail = email;
@@ -568,6 +591,9 @@ async function renderDetail() {
           : el("div", { class: "body none", text: "This email has no text." })),
       replyBox(email, keepDraft)),
   );
+  // J and K (and E, which opens the next one) will want these.
+  prefetch(neighbour(1));
+  prefetch(neighbour(-1));
 }
 
 function replyBox(email, draft) {
@@ -596,6 +622,7 @@ function replyBox(email, draft) {
       send.firstChild.textContent = "Sending…";
       try {
         await api(`/api/emails/${email.id}/reply`, { method: "POST", body: { text: text.value } });
+        setCachedStatus(email.id, "waiting");
         text.value = "";
         toast("Reply sent. The email is now waiting on the customer.");
         await render();
@@ -636,6 +663,7 @@ async function setStatus(id, to, { quiet = false } = {}) {
   const next = wasOpen && leaves ? neighbour(1) || neighbour(-1) || "" : null;
   try {
     await api(`/api/emails/${id}/status`, { method: "POST", body: { to } });
+    setCachedStatus(id, to);
   } catch (error) {
     toast(error.message, true);
     return;
@@ -682,6 +710,7 @@ async function loadInbox() {
   renderSync();
   renderSidebar();
   renderList();
+  if (!s.id) prefetch(neighbour(1)); // what J would open first
   // The server sent the list it had while it reads a fresh one from n8n: ask again shortly, once.
   clearTimeout(staleTimer);
   if (data.stale && !wasStale) staleTimer = setTimeout(backgroundRefresh, 2000);
