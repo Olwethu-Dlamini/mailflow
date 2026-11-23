@@ -33,6 +33,40 @@ On a phone the sidebar is a drawer and one pane shows at a time.
 
 Marking an email Done or Waiting opens the next one in the list, with Undo in the toast.
 
+## Speed
+
+Every request to the live site crosses Cloudflare, srv1 and ai (about 450 ms there and back), and
+a read of the list from n8n takes a second or more. So:
+
+- **The server keeps the 30-day list in memory** (`n8n.py`): read when the app starts, served as is
+  for 15 s, then served at once while a fresh copy is read in the background (up to 6 h old; the
+  sidebar says *Updating from n8n…* and the page asks again after 2 s). Opening an email and
+  status changes use the rows in memory; a change updates them in place.
+- **The page arrives with what it needs**: the account, the list and the open email are embedded
+  in `GET /` as JSON, so the list shows after one round trip. CSS and JS are stamped with a hash
+  of their contents and kept by the browser (and Cloudflare) for a year; a deploy changes the hash.
+- **The page does not wait for the server**: an email shows the moment it is picked (the list
+  holds all but its text, which follows), the next ones are fetched ahead, status changes and
+  Undo apply at once and are saved in the background, the working views are loaded ahead, and
+  long lists render 80 rows at a time.
+
+Measured on the laptop with `DEMO_N8N_MS=800 uv run python ../deck/demo_server.py` and a 450 ms
+round trip emulated in Chrome (23 Nov 2026):
+
+| Step | Before | After |
+|---|---|---|
+| Open the page: list shown | 1931 ms | 550 ms |
+| Open an email (text follows one round trip later) | 867 ms | 30–50 ms |
+| J to the next email | 880 ms | 20–40 ms |
+| E: Done, next email open | 2485 ms | 40–60 ms |
+| Z: Undo | 3314 ms | 30–40 ms |
+| Switch to P1 | 495 ms | 31 ms |
+| Draw a 3,000-email list | 2.7 s | 74 ms |
+
+Lighthouse (desktop, same 450 ms round trip): sign-in page and queue both 96 performance,
+100 accessibility, 100 best practices, 100 SEO (before: 96/91, 95, 96, 90). The rest of the
+performance score is the two round trips (page, then CSS) a first visit cannot avoid.
+
 ## Security
 
 - One account per person; an admin adds people under **Users**. Passwords are scrypt-hashed and
