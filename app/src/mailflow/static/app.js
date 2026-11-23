@@ -863,7 +863,7 @@ async function backgroundRefresh() {
 let inboxToken = 0;
 let statusChanges = 0; // made on this page; a list asked for before one is out of date
 let staleTimer = null;
-let wasStale = false;
+let staleDelay = 2000;
 async function loadInbox() {
   const token = ++inboxToken;
   const s = state();
@@ -885,10 +885,15 @@ function showInbox(data, { remembered = false } = {}) {
   renderList();
   if (!state().id) prefetch(neighbour(1)); // what J would open first
   if (remembered) return;
-  // The server sent the list it had while it reads a fresh one from n8n: ask again shortly, once.
+  // The server sent the list it had while it reads a fresh one from n8n: ask again shortly, and
+  // again, waiting longer each time (2 s, 4 s … 30 s) while n8n is slow or away.
   clearTimeout(staleTimer);
-  if (data.stale && !wasStale) staleTimer = setTimeout(backgroundRefresh, 2000);
-  wasStale = data.stale;
+  if (data.stale) {
+    staleTimer = setTimeout(backgroundRefresh, staleDelay);
+    staleDelay = Math.min(staleDelay * 2, 30_000);
+  } else {
+    staleDelay = 2000;
+  }
   if (!data.stale) setTimeout(loadOtherViews, 300);
 }
 
