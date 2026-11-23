@@ -79,7 +79,22 @@ class Engine:
         self._cache = (self._clock(), rows)
         return rows
 
+    def _cached(self, row_id: int) -> dict | None:
+        if not (self._cache and self._clock() - self._cache[0] < CACHE_SECONDS):
+            return None
+        return next((row for row in self._cache[1] if row.get("id") == row_id), None)
+
+    def _set_cached_status(self, match: Callable[[dict], bool], status: str) -> None:
+        # The change is already in n8n; the cached copy follows, so the list need not be read again.
+        for row in self._cache[1] if self._cache else []:
+            if match(row):
+                row["status"] = status
+
     async def get_row(self, row_id: int) -> dict | None:
+        """One row: from the cached list when it is there (it holds the whole row), else from n8n."""
+        cached = self._cached(row_id)
+        if cached is not None:
+            return cached
         params = {"limit": "1", "filter": _filter("id", "eq", row_id)}
         body = (await self._call("GET", self._rows_url, params=params, headers=self._headers)).json()
         data = body.get("data", [])
@@ -90,7 +105,7 @@ class Engine:
             raise ValueError(f"unknown status {to!r}")
         payload = {"filter": json.loads(_filter("id", "eq", row_id)), "data": {"status": to}}
         await self._call("PATCH", f"{self._rows_url}/update", json=payload, headers=self._headers)
-        self._cache = None
+        self._set_cached_status(lambda row: row.get("id") == row_id, to)
 
     async def send_reply(self, message_id: str, text: str) -> str:
         """Ask MailFlow · Reply to answer the email in Gmail. Returns 'sent', 'cannot' or 'not_found'."""
@@ -106,6 +121,6 @@ class Engine:
             result = None
         if result not in REPLY_RESULTS:
             raise EngineDown("the Reply workflow answered something unexpected")
-        if result == "sent":
-            self._cache = None
+        if result == "sent":  # MailFlow · Reply sets the row to waiting
+            self._set_cached_status(lambda row: row.get("message_id") == message_id, "waiting")
         return result

@@ -60,28 +60,61 @@ async def test_recent_rows_stops_at_the_cap():
     assert calls == 12
 
 
-async def test_recent_rows_are_cached_for_15_seconds_and_a_status_change_clears_it():
-    clock = [0.0]
-    lists = 0
+def counting(rows):
+    """An n8n that serves `rows` and counts list reads, single-row reads and writes."""
+    calls = {"list": 0, "one": 0, "write": 0}
 
     def handler(request):
-        nonlocal lists
-        if request.method == "GET":
-            lists += 1
-            return httpx.Response(200, json={"data": [{"id": 1}], "nextCursor": None})
-        return httpx.Response(200, json=True)
+        if request.method != "GET":
+            calls["write"] += 1
+            return httpx.Response(200, json={"result": "sent"} if "webhook" in request.url.path else True)
+        f = json.loads(request.url.params["filter"])["filters"][0]
+        if f["columnName"] == "id":
+            calls["one"] += 1
+            return httpx.Response(200, json={"data": [r for r in rows if r["id"] == f["value"]], "nextCursor": None})
+        calls["list"] += 1
+        return httpx.Response(200, json={"data": [dict(r) for r in rows], "nextCursor": None})
 
+    return handler, calls
+
+
+async def test_recent_rows_are_cached_for_15_seconds():
+    clock = [0.0]
+    handler, calls = counting([{"id": 1}])
     e = engine(handler, clock=lambda: clock[0])
     await e.recent_rows()
     clock[0] = 14.0
     await e.recent_rows()
-    assert lists == 1
+    assert calls["list"] == 1
     clock[0] = 16.0
     await e.recent_rows()
-    assert lists == 2
-    await e.set_status(1, "done")
+    assert calls["list"] == 2
+
+
+async def test_an_email_in_the_cached_list_opens_without_asking_n8n():
+    clock = [0.0]
+    handler, calls = counting([{"id": 1, "body": "hello"}, {"id": 2, "body": "world"}])
+    e = engine(handler, clock=lambda: clock[0])
     await e.recent_rows()
-    assert lists == 3
+    assert (await e.get_row(2))["body"] == "world"
+    assert calls["one"] == 0
+    assert await e.get_row(99) is None  # not in the list: n8n is asked
+    assert calls["one"] == 1
+    clock[0] = 16.0  # an old list is not trusted for one email
+    assert (await e.get_row(1))["body"] == "hello"
+    assert calls["one"] == 2
+
+
+async def test_a_status_change_or_a_sent_reply_updates_the_cached_list_in_place():
+    handler, calls = counting([{"id": 1, "message_id": "<a@x>", "status": "open"}, {"id": 2, "message_id": "<b@x>", "status": "open"}])
+    e = engine(handler)
+    await e.recent_rows()
+    await e.set_status(1, "done")
+    assert await e.send_reply("<b@x>", "Thanks") == "sent"
+    rows = await e.recent_rows()
+    assert [r["status"] for r in rows] == ["done", "waiting"]
+    assert (await e.get_row(1))["status"] == "done"
+    assert calls == {"list": 1, "one": 0, "write": 2}
 
 
 async def test_set_status_filters_by_row_id_and_refuses_an_unknown_status():
