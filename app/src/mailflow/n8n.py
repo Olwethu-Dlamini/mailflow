@@ -4,8 +4,10 @@ The API key and the reply secret stay in this process; the browser only ever tal
 
 Reading the 30-day list from n8n takes a second or more, so the list is kept in memory: younger
 than CACHE_SECONDS it is served as it is; up to STALE_SECONDS it is still served at once while a
-fresh copy is read in the background; older, or when there is none, the request waits for n8n.
-Only one read runs at a time, and the list is read once when the app starts.
+fresh copy is read in the background (the page shows it is updating and asks again); older, or
+when there is none, the request waits for n8n. Only one read runs at a time, and the list is read
+once when the app starts. Emails do not change once sorted, only their status, which the app
+itself sets (or n8n's Reply workflow, which the app calls).
 """
 
 import asyncio
@@ -25,7 +27,7 @@ PAGE = 250  # the n8n API's maximum page size
 DAYS = 30  # the queue shows the last 30 days, like the n8n Inbox page did
 ROW_CAP = 3000  # most rows read for one list; ~4.5 KB each, so ~13 MB at worst
 CACHE_SECONDS = 15
-STALE_SECONDS = 10 * 60
+STALE_SECONDS = 6 * 3600
 STATUSES = ("open", "waiting", "done")
 REPLY_RESULTS = ("sent", "cannot", "not_found")
 
@@ -64,6 +66,12 @@ class Engine:
         """The list being served is older than CACHE_SECONDS (a fresh copy is on its way)."""
         age = self._age()
         return age is None or age >= CACHE_SECONDS
+
+    @property
+    def ready(self) -> bool:
+        """A list can be served without waiting for n8n."""
+        age = self._age()
+        return age is not None and age < STALE_SECONDS
 
     def _read_once(self) -> asyncio.Task:
         """The read in progress, or a new one: requests that arrive meanwhile share it."""
@@ -122,9 +130,9 @@ class Engine:
         self._cache = (self._clock(), rows)
         return rows
 
-    def _cached(self, row_id: int) -> dict | None:
-        age = self._age()
-        if age is None or age >= STALE_SECONDS:
+    def cached_row(self, row_id: int) -> dict | None:
+        """The row from the list in memory, if there is a usable list and the row is in it."""
+        if not self.ready:
             return None
         return next((row for row in self._cache[1] if row.get("id") == row_id), None)
 
@@ -138,7 +146,7 @@ class Engine:
 
     async def get_row(self, row_id: int) -> dict | None:
         """One row: from the cached list when it is there (it holds the whole row), else from n8n."""
-        cached = self._cached(row_id)
+        cached = self.cached_row(row_id)
         if cached is not None:
             return cached
         params = {"limit": "1", "filter": _filter("id", "eq", row_id)}

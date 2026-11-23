@@ -248,7 +248,7 @@ function renderSync() {
     icon(syncError ? "warning" : "refresh"),
     el("span", { class: "sync-text", text: syncError
       ? `Not refreshed since ${loadedAt ? showTime(loadedAt, clockTime) : "opening"}`
-      : `Updated ${loadedAt ? showTime(loadedAt, clockTime) : "…"} · last 30 days` }));
+      : inbox?.stale ? "Updating from n8n…" : `Updated ${loadedAt ? showTime(loadedAt, clockTime) : "…"} · last 30 days` }));
 }
 
 function renderUser() {
@@ -753,13 +753,17 @@ async function loadInbox() {
   const q = new URLSearchParams({ view: s.view, mailbox: s.mailbox, topic: s.topic, sender: s.sender });
   const data = await api(`/api/inbox?${q}`);
   if (token !== inboxToken) return;
+  showInbox(data);
+}
+
+function showInbox(data) {
   inbox = data;
   loadedAt = new Date();
   syncError = "";
   renderSync();
   renderSidebar();
   renderList();
-  if (!s.id) prefetch(neighbour(1)); // what J would open first
+  if (!state().id) prefetch(neighbour(1)); // what J would open first
   // The server sent the list it had while it reads a fresh one from n8n: ask again shortly, once.
   clearTimeout(staleTimer);
   if (data.stale && !wasStale) staleTimer = setTimeout(backgroundRefresh, 2000);
@@ -968,12 +972,21 @@ document.addEventListener("keydown", (event) => {
 // --- start ------------------------------------------------------------------
 
 (async () => {
-  // The list and the account load side by side; a missing session sends api() to /login.
-  const meLoaded = api("/api/me");
-  $("list").replaceChildren(...listSkeleton());
   $("search").value = state().q;
   shown = state();
-  const first = render();
+  // The server sends the account, and the list and open email when it has them in memory, with
+  // the page; whatever it did not send is loaded now, side by side.
+  const boot = JSON.parse($("boot")?.textContent || "{}");
+  const meLoaded = boot.me ? Promise.resolve(boot.me) : api("/api/me");
+  if (boot.email) emails.set(String(boot.email.id), Promise.resolve(boot.email));
+  let first;
+  if (boot.inbox) {
+    showInbox(boot.inbox);
+    first = renderDetail();
+  } else {
+    $("list").replaceChildren(...listSkeleton());
+    first = render();
+  }
   try {
     me = await meLoaded;
   } catch {

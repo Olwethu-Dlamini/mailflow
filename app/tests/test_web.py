@@ -1,3 +1,4 @@
+import json
 import re
 
 import pytest
@@ -37,9 +38,13 @@ class FakeEngine:
         self.replies = []
         self.reply_result = "sent"
         self.stale = False
+        self.ready = True
 
     def warm(self):
         pass
+
+    def cached_row(self, row_id):
+        return next((r for r in ROWS if r["id"] == row_id), None) if self.ready else None
 
     def _check(self):
         if self.down:
@@ -304,3 +309,30 @@ def test_pages_link_stamped_static_files_that_are_kept_for_a_year(world):
         assert response.status_code == 200
         assert response.headers["cache-control"] == "public, max-age=31536000, immutable"
     assert client.get("/static/app.css").headers["cache-control"] == "no-cache"
+
+
+def boot_data(page: str) -> dict:
+    found = re.search(r'<script type="application/json" id="boot">(.*?)</script>', page, re.S)
+    assert found, "no boot data in the page"
+    return json.loads(found.group(1))
+
+
+def test_the_page_carries_the_account_list_and_open_email_with_email_text_kept_inert(world):
+    client, _, _ = world
+    login(client)
+    page = client.get("/?view=all&id=1").text
+    boot = boot_data(page)
+    assert boot["me"]["email"] == "staff@example.com"
+    assert [item["id"] for item in boot["inbox"]["items"]] == [2, 1]
+    assert boot["email"]["body"] == "<script>alert(1)</script>"
+    assert "<script>alert" not in page  # the body cannot close the data block or open a script
+
+
+def test_without_a_list_in_memory_the_page_does_not_wait_for_n8n(world):
+    client, engine, _ = world
+    login(client)
+    engine.ready = False
+    engine.down = True  # any call to n8n would fail
+    boot = boot_data(client.get("/?id=1").text)
+    assert boot["me"]["email"] == "staff@example.com"
+    assert "inbox" not in boot and "email" not in boot

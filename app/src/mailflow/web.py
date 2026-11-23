@@ -4,6 +4,7 @@ Run: uvicorn --factory mailflow.web:main_app
 """
 
 import hashlib
+import json
 import logging
 import re
 import secrets
@@ -197,10 +198,22 @@ def create_app(
     pages = _pages()
 
     @app.get("/")
-    def index(request: Request):
-        if auth.session_user(store, request.cookies.get(COOKIE, ""), clock()) is None:
+    async def index(request: Request):
+        user = auth.session_user(store, request.cookies.get(COOKIE, ""), clock())
+        if user is None:
             return RedirectResponse("/login", 303)
-        return HTMLResponse(pages["index.html"])
+        # The account, the list and the open email ride along with the page, so it shows them
+        # without three more round trips. Only what is in memory: the page never waits for n8n.
+        q = request.query_params
+        boot = {"me": _user_json(user)}
+        if engine.ready:
+            boot["inbox"] = await _inbox_json(q.get("view", "reply"), q.get("mailbox", ""), q.get("topic", ""), q.get("sender", ""))
+            row = engine.cached_row(int(q["id"])) if q.get("id", "").isdigit() else None
+            if row is not None:
+                boot["email"] = _email_json(row)
+        # As data, not script (the CSP runs none inline); "<" escaped so no text can close the tag.
+        data = json.dumps(boot).replace("<", "\\u003c")
+        return HTMLResponse(pages["index.html"].replace("</body>", f'<script type="application/json" id="boot">{data}</script>\n</body>'))
 
     @app.get("/login")
     def login_page():
@@ -305,14 +318,25 @@ def create_app(
 
     # email
 
-    @app.get("/api/inbox")
-    async def inbox(view: str = "reply", mailbox: str = "", topic: str = "", sender: str = "", user: User = Depends(current_user)):
+    async def _inbox_json(view: str, mailbox: str, topic: str, sender: str) -> dict:
         rows = await engine.recent_rows()
         result = queue.build(rows, view, mailbox, topic, sender, datetime.now(UTC))
         result["reply_mailboxes"] = REPLY_MAILBOXES
         # An older list served while a fresh one is read: the page asks again in a moment.
         result["stale"] = engine.stale
         return result
+
+    def _email_json(row: dict) -> dict:
+        return {
+            **{k: row.get(k) for k in (*queue.ITEM_FIELDS, "body")},
+            "status": queue.status_of(row),
+            "needs_reply": queue.needs_reply(row),
+            "can_reply": row.get("mailbox") in REPLY_MAILBOXES,
+        }
+
+    @app.get("/api/inbox")
+    async def inbox(view: str = "reply", mailbox: str = "", topic: str = "", sender: str = "", user: User = Depends(current_user)):
+        return await _inbox_json(view, mailbox, topic, sender)
 
     async def _row(row_id: int) -> dict:
         row = await engine.get_row(row_id)
@@ -322,13 +346,7 @@ def create_app(
 
     @app.get("/api/emails/{row_id}")
     async def email(row_id: int, user: User = Depends(current_user)):
-        row = await _row(row_id)
-        return {
-            **{k: row.get(k) for k in (*queue.ITEM_FIELDS, "body")},
-            "status": queue.status_of(row),
-            "needs_reply": queue.needs_reply(row),
-            "can_reply": row.get("mailbox") in REPLY_MAILBOXES,
-        }
+        return _email_json(await _row(row_id))
 
     @app.post("/api/emails/{row_id}/status")
     async def set_status(row_id: int, body: StatusChange, user: User = Depends(current_user)):

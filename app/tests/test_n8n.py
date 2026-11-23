@@ -94,14 +94,15 @@ async def test_a_fresh_list_is_served_as_it_is_and_an_older_one_at_once_while_it
     assert calls["list"] == 2 and not e.stale
 
 
-async def test_a_list_older_than_ten_minutes_waits_for_n8n():
+async def test_a_list_older_than_six_hours_waits_for_n8n():
     clock = [0.0]
     rows = [{"id": 1}]
     handler, calls = counting(rows)
     e = engine(handler, clock=lambda: clock[0])
     await e.recent_rows()
     rows.append({"id": 2})
-    clock[0] = 601.0
+    clock[0] = 6 * 3600 + 1.0
+    assert not e.ready
     assert [r["id"] for r in await e.recent_rows()] == [1, 2]
     assert calls["list"] == 2
 
@@ -167,7 +168,7 @@ async def test_an_email_in_the_cached_list_opens_without_asking_n8n():
     assert calls["one"] == 0
     assert await e.get_row(99) is None  # not in the list: n8n is asked
     assert calls["one"] == 1
-    clock[0] = 601.0  # a list older than ten minutes is not trusted for one email
+    clock[0] = 6 * 3600 + 1.0  # a list older than six hours is not trusted for one email
     assert (await e.get_row(1))["body"] == "hello"
     assert calls["one"] == 2
 
