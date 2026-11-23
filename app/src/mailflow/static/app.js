@@ -182,15 +182,31 @@ function urlFor(changes) {
   return query ? `/?${query}` : "/";
 }
 
+// What the page shows now; go() compares against it to do as little as the change needs.
+const LIST_KEYS = ["view", "mailbox", "topic", "sender"];
+let shown = null;
+
+// Bring the page in line with the address bar. Only a new view or filter asks the server for the
+// list again; opening another email or searching works on the list already loaded.
+function show() {
+  const s = state();
+  const before = shown;
+  shown = s;
+  if (!inbox || !before || LIST_KEYS.some((key) => s[key] !== before[key])) return render();
+  if (s.q !== before.q) renderList();
+  else markSelected();
+  return renderDetail();
+}
+
 function go(changes) {
   history.pushState(null, "", urlFor(changes));
   closeDrawer();
-  render();
+  return show();
 }
 
 window.addEventListener("popstate", () => {
   $("search").value = state().q;
-  render();
+  show();
 });
 
 // --- left: views, mailboxes, account ---------------------------------------
@@ -292,6 +308,7 @@ $("scrim").addEventListener("click", closeDrawer);
 $("search").parentElement.querySelector(".search-icon").replaceWith(icon("search"));
 $("search").addEventListener("input", () => {
   history.replaceState(null, "", urlFor({ q: $("search").value.trim() }));
+  shown = state();
   if (inbox) renderList();
 });
 $("search").addEventListener("keydown", (event) => {
@@ -426,10 +443,27 @@ function renderList() {
     return;
   }
   list.replaceChildren(header, ...items.map((item) => row(item, String(item.id) === s.id)));
-  // Keep the open email in sight when J/K move past the edge of the list (only when it changes,
-  // so a background refresh never scrolls the list away from where the reader left it).
-  if (s.id && s.id !== scrolledTo) list.querySelector(".item.selected")?.scrollIntoView({ block: "nearest" });
-  scrolledTo = s.id;
+  keepSelectedInSight();
+}
+
+// Move the highlight without rebuilding the list.
+function markSelected() {
+  const id = state().id;
+  for (const node of $("list").querySelectorAll(".item")) {
+    const on = node.dataset.id === id;
+    node.classList.toggle("selected", on);
+    if (on) node.setAttribute("aria-current", "true");
+    else node.removeAttribute("aria-current");
+  }
+  keepSelectedInSight();
+}
+
+// Keep the open email in sight when J/K move past the edge of the list (only when it changes,
+// so a background refresh never scrolls the list away from where the reader left it).
+function keepSelectedInSight() {
+  const id = state().id;
+  if (id && id !== scrolledTo) $("list").querySelector(".item.selected")?.scrollIntoView({ block: "nearest" });
+  scrolledTo = id;
 }
 
 // --- right: one email -------------------------------------------------------
@@ -634,6 +668,8 @@ async function backgroundRefresh() {
 // Each load gets a number; an answer that arrives after a newer load started is dropped, so a
 // click during a slow load is never lost and an old answer never overwrites a newer one.
 let inboxToken = 0;
+let staleTimer = null;
+let wasStale = false;
 async function loadInbox() {
   const token = ++inboxToken;
   const s = state();
@@ -646,6 +682,10 @@ async function loadInbox() {
   renderSync();
   renderSidebar();
   renderList();
+  // The server sent the list it had while it reads a fresh one from n8n: ask again shortly, once.
+  clearTimeout(staleTimer);
+  if (data.stale && !wasStale) staleTimer = setTimeout(backgroundRefresh, 2000);
+  wasStale = data.stale;
 }
 
 // A failed load keeps the list already on screen (flagged as not refreshed); with nothing to keep
@@ -850,8 +890,14 @@ document.addEventListener("keydown", (event) => {
 // --- start ------------------------------------------------------------------
 
 (async () => {
+  // The list and the account load side by side; a missing session sends api() to /login.
+  const meLoaded = api("/api/me");
+  $("list").replaceChildren(...listSkeleton());
+  $("search").value = state().q;
+  shown = state();
+  const first = render();
   try {
-    me = await api("/api/me");
+    me = await meLoaded;
   } catch {
     return;
   }
@@ -860,9 +906,7 @@ document.addEventListener("keydown", (event) => {
     googleSignIn = Boolean(options.google);
     setPasswordRule();
   }).catch(() => {});
-  $("list").replaceChildren(...listSkeleton());
-  $("search").value = state().q;
-  await render();
+  await first;
   setInterval(backgroundRefresh, REFRESH_MS);
   document.addEventListener("visibilitychange", backgroundRefresh);
 })();
