@@ -295,6 +295,9 @@ body.app { flex-direction: row; background: var(--canvas); }
 .sender .when { flex: none; align-self: flex-start; color: var(--faint); font-size: 12px; }
 .body { margin: 0; padding: 16px 18px 20px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; font-size: 14px; color: var(--text-2); }
 .body.none { color: var(--faint); font-style: italic; }
+.body.loading { display: flex; flex-direction: column; gap: 10px; padding-top: 22px; }
+.body.loading i { display: block; height: 10px; border-radius: 6px; background: var(--neutral-soft); animation: pulse 1.2s ease-in-out infinite alternate; }
+.body.loading .w85 { width: 85%; } .body.loading .w65 { width: 65%; } .body.loading .w40 { width: 40%; }
 .reply { margin-top: 18px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--bg); box-shadow: var(--shadow-sm); transition: border-color .12s, box-shadow .12s; }
 .reply:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 .reply-to { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--line); color: var(--muted); font-size: 13px; }

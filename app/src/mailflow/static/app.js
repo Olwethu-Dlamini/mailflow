@@ -512,9 +512,13 @@ function detailBar(email) {
 // Emails already fetched (or on their way), by id. The text of an email never changes; its status
 // is taken from the list, which is kept current.
 const emails = new Map();
+const fetched = new Set(); // ids whose fetch has finished: those render with no wait at all
 function fetchEmail(id) {
   if (!emails.has(id)) {
-    emails.set(id, api(`/api/emails/${encodeURIComponent(id)}`).catch((error) => {
+    emails.set(id, api(`/api/emails/${encodeURIComponent(id)}`).then((email) => {
+      fetched.add(id);
+      return email;
+    }, (error) => {
       emails.delete(id);
       throw error;
     }));
@@ -539,10 +543,14 @@ async function renderDetail() {
     return;
   }
   const token = ++detailToken;
-  if (detail.dataset.id !== s.id) {
-    // E/W/U must not reach the previous email while this one loads.
-    openEmail = null;
-    detail.replaceChildren(detailBar(null), placeholder("inbox", "Opening…"));
+  const listed = inbox?.items.find((item) => String(item.id) === s.id);
+  const keepDraft = detail.dataset.id === s.id ? detail.querySelector("textarea")?.value || "" : "";
+  // Not fetched yet: show what the list already knows (all but the text) straight away, and
+  // let E/W/U act on it; the text follows.
+  if (!fetched.has(s.id) && detail.dataset.id !== s.id) {
+    openEmail = listed ? { ...listed, can_reply: inbox.reply_mailboxes.includes(listed.mailbox) } : null;
+    detail.dataset.id = listed ? s.id : "";
+    detail.replaceChildren(...(listed ? emailView(listed, { loading: true }) : [detailBar(null), placeholder("inbox", "Opening…")]));
   }
   let email;
   try {
@@ -555,14 +563,26 @@ async function renderDetail() {
     return;
   }
   if (token !== detailToken) return;
-  const listed = inbox?.items.find((item) => String(item.id) === s.id);
   if (listed) email.status = listed.status;
-  const keepDraft = detail.dataset.id === s.id ? detail.querySelector("textarea")?.value || "" : "";
   detail.dataset.id = s.id;
   openEmail = email;
+  detail.replaceChildren(...emailView(email, { draft: keepDraft }));
+  // J and K (and E, which opens the next one) will want these.
+  prefetch(neighbour(1));
+  prefetch(neighbour(-1));
+}
+
+// The open email: the action bar, then subject and labels, the AI card, the message and the reply
+// box. `loading`: the text is on its way, so grey lines stand in for it and there is no reply box yet.
+function emailView(email, { loading = false, draft = "" } = {}) {
   const name = email.from_name || email.from_address || "";
   const unsorted = email.sorted_by === "unsorted";
-  detail.replaceChildren(
+  const text = loading
+    ? el("div", { class: "body loading", "aria-busy": "true" }, el("i", { class: "w85" }), el("i", { class: "w65" }), el("i", { class: "w40" }))
+    : (email.body || "").trim()
+      ? el("div", { class: "body", text: email.body })
+      : el("div", { class: "body none", text: "This email has no text." });
+  return [
     detailBar(email),
     el("article", { class: "detail-body" },
       el("h1", { class: "detail-subject", text: email.subject || "(no subject)" }),
@@ -586,14 +606,9 @@ async function renderDetail() {
               email.from_name ? el("span", { class: "muted", text: ` <${email.from_address || ""}>` }) : null),
             el("div", { class: "muted small", text: `to ${email.mailbox || ""}` })),
           el("span", { class: "when", text: showTime(email.received_at, fullTime) })),
-        (email.body || "").trim()
-          ? el("div", { class: "body", text: email.body })
-          : el("div", { class: "body none", text: "This email has no text." })),
-      replyBox(email, keepDraft)),
-  );
-  // J and K (and E, which opens the next one) will want these.
-  prefetch(neighbour(1));
-  prefetch(neighbour(-1));
+        text),
+      loading ? null : replyBox(email, draft)),
+  ];
 }
 
 function replyBox(email, draft) {
@@ -978,7 +993,10 @@ document.addEventListener("keydown", (event) => {
   // the page; whatever it did not send is loaded now, side by side.
   const boot = JSON.parse($("boot")?.textContent || "{}");
   const meLoaded = boot.me ? Promise.resolve(boot.me) : api("/api/me");
-  if (boot.email) emails.set(String(boot.email.id), Promise.resolve(boot.email));
+  if (boot.email) {
+    emails.set(String(boot.email.id), Promise.resolve(boot.email));
+    fetched.add(String(boot.email.id));
+  }
   let first;
   if (boot.inbox) {
     showInbox(boot.inbox);
