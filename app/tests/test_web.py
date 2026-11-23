@@ -34,6 +34,10 @@ class FakeEngine:
         self.statuses = []
         self.replies = []
         self.reply_result = "sent"
+        self.stale = False
+
+    def warm(self):
+        pass
 
     def _check(self):
         if self.down:
@@ -99,6 +103,7 @@ def test_login_sets_an_httponly_strict_cookie_and_inbox_works(world):
     assert [item["id"] for item in inbox["items"]] == [2, 1]
     assert all("body" not in item for item in inbox["items"])
     assert inbox["reply_mailboxes"] == ["gmail"]
+    assert inbox["stale"] is False
 
 
 def test_wrong_password_is_401_with_the_generic_message(world):

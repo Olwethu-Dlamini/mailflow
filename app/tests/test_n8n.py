@@ -1,3 +1,4 @@
+import asyncio
 import json
 from datetime import UTC, datetime
 
@@ -78,17 +79,83 @@ def counting(rows):
     return handler, calls
 
 
-async def test_recent_rows_are_cached_for_15_seconds():
+async def test_a_fresh_list_is_served_as_it_is_and_an_older_one_at_once_while_it_is_read_again():
     clock = [0.0]
     handler, calls = counting([{"id": 1}])
     e = engine(handler, clock=lambda: clock[0])
     await e.recent_rows()
     clock[0] = 14.0
     await e.recent_rows()
-    assert calls["list"] == 1
+    assert calls["list"] == 1 and not e.stale
     clock[0] = 16.0
+    assert [r["id"] for r in await e.recent_rows()] == [1]  # served before n8n answered
+    assert e.stale
+    await e._reading
+    assert calls["list"] == 2 and not e.stale
+
+
+async def test_a_list_older_than_ten_minutes_waits_for_n8n():
+    clock = [0.0]
+    rows = [{"id": 1}]
+    handler, calls = counting(rows)
+    e = engine(handler, clock=lambda: clock[0])
     await e.recent_rows()
+    rows.append({"id": 2})
+    clock[0] = 601.0
+    assert [r["id"] for r in await e.recent_rows()] == [1, 2]
     assert calls["list"] == 2
+
+
+async def test_requests_that_arrive_together_share_one_read():
+    handler, calls = counting([{"id": 1}])
+    e = engine(handler)
+    e.warm()
+    await asyncio.gather(e.recent_rows(), e.recent_rows(), e.recent_rows())
+    assert calls["list"] == 1
+
+
+async def test_a_failed_background_read_keeps_serving_the_list():
+    clock = [0.0]
+    down = [False]
+
+    def handler(request):
+        if down[0]:
+            raise httpx.ConnectError("refused")
+        return httpx.Response(200, json={"data": [{"id": 1}], "nextCursor": None})
+
+    e = engine(handler, clock=lambda: clock[0])
+    await e.recent_rows()
+    down[0], clock[0] = True, 30.0
+    assert [r["id"] for r in await e.recent_rows()] == [1]
+    with pytest.raises(EngineDown):
+        await e._reading
+    assert [r["id"] for r in await e.recent_rows()] == [1]
+
+
+async def test_a_status_change_during_a_background_read_is_not_lost():
+    clock = [0.0]
+    release = asyncio.Event()
+    reads = 0
+
+    async def handler(request):
+        nonlocal reads
+        if request.method == "GET":
+            reads += 1
+            if reads == 2:
+                await release.wait()  # n8n answers with the status it had when the read began
+            return httpx.Response(200, json={"data": [{"id": 1, "status": "open"}], "nextCursor": None})
+        return httpx.Response(200, json=True)
+
+    e = engine(handler, clock=lambda: clock[0])
+    await e.recent_rows()
+    clock[0] = 20.0
+    await e.recent_rows()  # starts the background read, which hangs
+    await asyncio.sleep(0)
+    clock[0] = 21.0
+    await e.set_status(1, "done")
+    release.set()
+    await e._reading
+    assert (await e.recent_rows())[0]["status"] == "done"
 
 
 async def test_an_email_in_the_cached_list_opens_without_asking_n8n():
@@ -100,7 +167,7 @@ async def test_an_email_in_the_cached_list_opens_without_asking_n8n():
     assert calls["one"] == 0
     assert await e.get_row(99) is None  # not in the list: n8n is asked
     assert calls["one"] == 1
-    clock[0] = 16.0  # an old list is not trusted for one email
+    clock[0] = 601.0  # a list older than ten minutes is not trusted for one email
     assert (await e.get_row(1))["body"] == "hello"
     assert calls["one"] == 2
 

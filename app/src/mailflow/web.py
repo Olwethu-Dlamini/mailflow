@@ -88,6 +88,7 @@ def create_app(
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        engine.warm()  # read the list now, so the first visitor does not wait for n8n
         yield
         for client in (engine, google):
             if hasattr(client, "aclose"):
@@ -288,6 +289,8 @@ def create_app(
         rows = await engine.recent_rows()
         result = queue.build(rows, view, mailbox, topic, sender, datetime.now(UTC))
         result["reply_mailboxes"] = REPLY_MAILBOXES
+        # An older list served while a fresh one is read: the page asks again in a moment.
+        result["stale"] = engine.stale
         return result
 
     async def _row(row_id: int) -> dict:
