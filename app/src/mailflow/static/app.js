@@ -1096,10 +1096,11 @@ document.addEventListener("keydown", (event) => {
 (async () => {
   $("search").value = state().q;
   shown = state();
-  // The server sends the account, and the list and open email when it has them in memory, with
-  // the page; whatever it did not send is loaded now, side by side.
-  const boot = JSON.parse($("boot")?.textContent || "{}");
-  const meLoaded = boot.me ? Promise.resolve(boot.me) : api("/api/me");
+  // The server sends the account, whether Google sign-in is on, and the list and open email when
+  // it has them in memory, with the page; what it did not send is loaded now.
+  const boot = JSON.parse($("boot").textContent);
+  me = boot.me;
+  googleSignIn = boot.google;
   if (boot.email) {
     emails.set(String(boot.email.id), Promise.resolve(boot.email));
     fetched.add(String(boot.email.id));
@@ -1112,16 +1113,8 @@ document.addEventListener("keydown", (event) => {
     $("list").replaceChildren(...listSkeleton());
     first = render();
   }
-  try {
-    me = await meLoaded;
-  } catch {
-    return;
-  }
   renderUser();
-  api("/api/login-options").then((options) => {
-    googleSignIn = Boolean(options.google);
-    setPasswordRule();
-  }).catch(() => {});
+  setPasswordRule();
   await first;
   setInterval(backgroundRefresh, REFRESH_MS);
   document.addEventListener("visibilitychange", backgroundRefresh);

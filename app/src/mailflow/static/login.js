@@ -23,14 +23,6 @@ if (query.get("changed") === "1") show("Password changed. Sign in with the new o
 if (GOOGLE_ERRORS[query.get("error")]) show(GOOGLE_ERRORS[query.get("error")]);
 if (query.has("changed") || query.has("error")) history.replaceState(null, "", "/login");
 
-fetch("/api/login-options")
-  .then((response) => (response.ok ? response.json() : {}))
-  .then((options) => {
-    document.getElementById("google").hidden = !options.google;
-    document.getElementById("or").hidden = !options.google;
-  })
-  .catch(() => {});
-
 toggle.addEventListener("click", () => {
   const showing = form.password.type === "text";
   form.password.type = showing ? "password" : "text";

@@ -196,6 +196,8 @@ def create_app(
         return {"ok": True}
 
     pages = _pages()
+    if google is not None:  # the sign-in page shows "Continue with Google" from the first paint
+        pages["login.html"] = pages["login.html"].replace("data-google hidden", "data-google")
 
     @app.get("/")
     async def index(request: Request):
@@ -205,7 +207,7 @@ def create_app(
         # The account, the list and the open email ride along with the page, so it shows them
         # without three more round trips. Only what is in memory: the page never waits for n8n.
         q = request.query_params
-        boot = {"me": _user_json(user)}
+        boot = {"me": _user_json(user), "google": google is not None}
         if engine.ready:
             boot["inbox"] = await _inbox_json(q.get("view", "reply"), q.get("mailbox", ""), q.get("topic", ""), q.get("sender", ""))
             row = engine.cached_row(int(q["id"])) if q.get("id", "").isdigit() else None
@@ -228,10 +230,6 @@ def create_app(
             COOKIE, token, max_age=auth.MAX_SECONDS, httponly=True, secure=settings.cookie_secure, samesite="strict", path="/"
         )
         return response
-
-    @app.get("/api/login-options")
-    def login_options():
-        return {"google": google is not None}
 
     @app.post("/api/login")
     def login(body: Login, request: Request):

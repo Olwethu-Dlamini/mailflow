@@ -140,11 +140,11 @@ def callback(client, state, code="code-1"):
     return client.get(f"/auth/google/callback?code={code}&state={state}", follow_redirects=False)
 
 
-def test_login_options_say_whether_google_is_on(world):
+def test_the_sign_in_page_shows_the_google_button_only_when_google_is_on(world):
     client, _, _ = world
-    assert client.get("/api/login-options").json() == {"google": True}
+    assert 'href="/auth/google" data-google>' in client.get("/login").text
     plain = TestClient(create_app(SETTINGS, FakeEngine(), Store(":memory:")), base_url=ORIGIN)
-    assert plain.get("/api/login-options").json() == {"google": False}
+    assert 'href="/auth/google" data-google hidden>' in plain.get("/login").text
     assert plain.get("/auth/google", follow_redirects=False).status_code == 404
 
 
