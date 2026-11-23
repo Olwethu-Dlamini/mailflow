@@ -312,7 +312,7 @@ def test_pages_link_stamped_static_files_that_are_kept_for_a_year(world):
 
 
 def boot_data(page: str) -> dict:
-    found = re.search(r'<script type="application/json" id="boot">(.*?)</script>', page, re.S)
+    found = re.search(r'<script type="application/json" id="boot">(.*?)</script>', page, re.DOTALL)
     assert found, "no boot data in the page"
     return json.loads(found.group(1))
 

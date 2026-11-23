@@ -56,11 +56,11 @@ round trip emulated in Chrome (23 Nov 2026):
 | Step | Before | After |
 |---|---|---|
 | Open the page: list shown | 1931 ms | 550 ms |
-| Open an email (text follows one round trip later) | 867 ms | 30–50 ms |
+| Open an email (text follows one round trip later) | 867 ms | 20–50 ms |
 | J to the next email | 880 ms | 20–40 ms |
-| E: Done, next email open | 2485 ms | 40–60 ms |
-| Z: Undo | 3314 ms | 30–40 ms |
-| Switch to P1 | 495 ms | 31 ms |
+| E: Done, next email open | 2485 ms | 40–80 ms |
+| Z: Undo | 3314 ms | 15–40 ms |
+| Switch to P1 | 495 ms | 30–50 ms |
 | Draw a 3,000-email list | 2.7 s | 74 ms |
 
 Lighthouse (desktop, same 450 ms round trip): sign-in page and queue both 96 performance,
