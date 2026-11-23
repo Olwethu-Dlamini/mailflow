@@ -211,6 +211,9 @@ body.app { flex-direction: row; background: var(--canvas); }
   position: relative; width: 100%; display: flex; gap: 12px; align-items: flex-start; padding: 12px 16px 12px 18px;
   border: 0; border-bottom: 1px solid var(--line); background: var(--bg); color: var(--text); text-align: left; cursor: pointer;
 }
+/* rows out of sight are not laid out or painted until they scroll near */
+.item { content-visibility: auto; contain-intrinsic-size: auto 96px; }
+.more { height: 1px; }
 .item::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: transparent; }
 .item.P1::before { background: var(--red); }
 .item:hover { background: var(--hover); }

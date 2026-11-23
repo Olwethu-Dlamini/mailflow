@@ -393,12 +393,12 @@ function listHead(shown) {
 }
 
 // "14:20" today, "Yesterday", else "20 Nov": the full time is in the tooltip.
-function shortTime(value) {
+function shortTime(value, today, yesterday) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "";
   const day = dayKey.format(date);
-  if (day === dayKey.format(new Date())) return clockTime.format(date);
-  if (day === dayKey.format(new Date(Date.now() - 86_400_000))) return "Yesterday";
+  if (day === today) return clockTime.format(date);
+  if (day === yesterday) return "Yesterday";
   return shortDay.format(date);
 }
 
@@ -425,8 +425,9 @@ function listSkeleton() {
     el("span", { class: "lines" }, el("i", { class: "w40" }), el("i", { class: "w85" }), el("i", { class: "w65" }))));
 }
 
-function row(item, selected) {
+function row(item, ctx) {
   const name = item.from_name || item.from_address || "(unknown sender)";
+  const selected = String(item.id) === ctx.selected;
   return el("button", {
     type: "button",
     class: `item ${item.status} ${item.status !== "done" ? item.priority || "" : ""}${selected ? " selected" : ""}`,
@@ -442,7 +443,7 @@ function row(item, selected) {
         el("span", { class: "from", text: name }),
         item.waiting ? el("span", { class: item.late ? "age late" : "age", title: item.late ? "Waiting longer than its priority allows" : "Waiting for a reply" },
           icon("clock"), item.waiting) : null,
-        el("span", { class: "time", title: showTime(item.received_at, fullTime), text: shortTime(item.received_at) })),
+        el("span", { class: "time", title: showTime(item.received_at, fullTime), text: shortTime(item.received_at, ctx.today, ctx.yesterday) })),
       el("span", { class: "subject-line" },
         item.priority ? el("span", { class: `prio ${item.priority}`, text: item.priority }) : null,
         el("span", { class: "subject", text: item.subject || "(no subject)" })),
@@ -453,11 +454,36 @@ function row(item, selected) {
         item.type ? el("span", { class: `chip topic ${TOPIC_CLASS[item.type] || ""}`.trim(), text: item.type }) : null,
         item.sender ? el("span", { class: "chip role", text: item.sender }) : null,
         // the state only where a view mixes them
-        ["all", "p1"].includes(inbox.view) && item.status !== "open" ? el("span", { class: `chip st ${item.status}`, text: STATUS_TEXT[item.status] }) : null,
-        state().mailbox ? null : el("span", { class: "boxname" }, el("span", { class: `dot ${colourOf(item.mailbox)}` }), item.mailbox || ""))));
+        ctx.mixed && item.status !== "open" ? el("span", { class: `chip st ${item.status}`, text: STATUS_TEXT[item.status] }) : null,
+        ctx.hideBox ? null : el("span", { class: "boxname" }, el("span", { class: `dot ${colourOf(item.mailbox)}` }), item.mailbox || ""))));
 }
 
+// Long lists render a page of rows at a time: the next page is added when the reader scrolls near
+// the end (or J moves past it), so a 3,000-email view costs no more than a short one.
+const PAGE_ROWS = 80;
 let scrolledTo = "";
+let rowsToShow = [];
+let rowsShown = 0;
+let rowContext = null;
+const more = el("div", { class: "more", "aria-hidden": "true" });
+const moreWatcher = new IntersectionObserver((entries) => {
+  if (entries.some((entry) => entry.isIntersecting)) showMoreRows(rowsShown + PAGE_ROWS);
+}, { root: $("list"), rootMargin: "800px 0px" });
+moreWatcher.observe(more);
+
+function showMoreRows(upTo) {
+  const until = Math.min(rowsToShow.length, upTo);
+  if (until <= rowsShown) return;
+  more.before(...rowsToShow.slice(rowsShown, until).map((item, k) => {
+    const node = row(item, rowContext);
+    // The first rows get a name so a view transition can slide each into its new place.
+    if (rowsShown + k < 40) node.style.viewTransitionName = `row-${item.id}`;
+    return node;
+  }));
+  rowsShown = until;
+  more.hidden = rowsShown >= rowsToShow.length;
+}
+
 function renderList() {
   const s = state();
   const list = $("list");
@@ -474,18 +500,36 @@ function renderList() {
       : emptyState({ kind: ["reply", "p1"].includes(inbox.view) ? "good" : "", iconName: inbox.view === "reply" || inbox.view === "p1" ? "check" : "inbox", title, text }));
     return;
   }
-  list.replaceChildren(header, ...items.map((item) => row(item, String(item.id) === s.id)));
+  // Worked out once per list, not once per row.
+  rowContext = {
+    selected: s.id,
+    mixed: ["all", "p1"].includes(inbox.view),
+    hideBox: Boolean(s.mailbox),
+    today: dayKey.format(new Date()),
+    yesterday: dayKey.format(new Date(Date.now() - 86_400_000)),
+  };
+  rowsToShow = items;
+  rowsShown = 0;
+  list.replaceChildren(header, more);
+  const at = s.id ? items.findIndex((item) => String(item.id) === s.id) : -1;
+  showMoreRows(Math.max(PAGE_ROWS, at + 1 + PAGE_ROWS / 2));
   keepSelectedInSight();
 }
 
 // Move the highlight without rebuilding the list.
 function markSelected() {
   const id = state().id;
-  for (const node of $("list").querySelectorAll(".item")) {
-    const on = node.dataset.id === id;
-    node.classList.toggle("selected", on);
-    if (on) node.setAttribute("aria-current", "true");
-    else node.removeAttribute("aria-current");
+  if (rowContext) rowContext.selected = id;
+  for (const node of $("list").querySelectorAll(".item.selected, .item[aria-current]")) {
+    node.classList.remove("selected");
+    node.removeAttribute("aria-current");
+  }
+  const at = id ? rowsToShow.findIndex((item) => String(item.id) === id) : -1;
+  if (at >= rowsShown) showMoreRows(at + 1 + PAGE_ROWS / 2);
+  const node = id && $("list").querySelector(`.item[data-id="${CSS.escape(id)}"]`);
+  if (node) {
+    node.classList.add("selected");
+    node.setAttribute("aria-current", "true");
   }
   keepSelectedInSight();
 }
