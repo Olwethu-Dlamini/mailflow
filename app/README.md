@@ -65,7 +65,8 @@ round trip emulated in Chrome (23 Nov 2026):
 
 Lighthouse (desktop, same 450 ms round trip): sign-in page and queue both 96 performance,
 100 accessibility, 100 best practices, 100 SEO (before: 96/91, 95, 96, 90). The rest of the
-performance score is the two round trips (page, then CSS) a first visit cannot avoid.
+performance score is the two round trips (page, then CSS) a first visit cannot avoid. The full
+reports, before and after: [docs/lighthouse](../docs/lighthouse/README.md).
 
 ## Security
 
