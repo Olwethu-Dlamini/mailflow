@@ -55,12 +55,13 @@ flow(s, TOP + Inches(0.25), [
 
 # 4 ---------------------------------------------------------------------------------------------
 s = d.slide("What your team sees", "One shared inbox, sorted for the event", (
-    "This is the MailFlow page. On the left: views such as Needs reply and P1, answer today, plus "
-    "filters by mailbox, topic and sender. In the middle: the queue, most urgent first, each email "
-    "with its summary, the next step and how long it has been waiting; the waiting time turns red "
-    "when it is late. On the right: the open email, what the AI made of it, and the buttons to mark it "
-    "replied or done. Here the top email is a code-of-conduct report, marked P1 and shown in red."),
-    subtitle="Views and filters on the left, the queue in the middle, the open email on the right.")
+    "This is the MailFlow page. On the left: search, the views such as Needs reply, Mine and P1, "
+    "answer today, and your mailboxes. In the middle: the queue, most urgent first, each email with "
+    "its next step and how long it has been waiting; the waiting time turns red when it is late. Topic "
+    "and sender filters sit above it. On the right: the open email, what the AI made of it, and the "
+    "buttons to take it, mark it replied or done. Here the top email is a code-of-conduct report, "
+    "marked P1 and shown in red."),
+    subtitle="Views on the left, the queue in the middle, the open email on the right.")
 picture(s, "app/queue.png", y=Inches(1.9), max_h=Inches(4.85))
 
 # 5 ---------------------------------------------------------------------------------------------
@@ -138,16 +139,31 @@ text(s, x0, TOP + Inches(3.5), Inches(3.8), Inches(1.0),
      "Replies from the page: Gmail mailboxes today. Other mailboxes: reply in your mail app, mark it here.",
      13, MUTED)
 
+# 7b --------------------------------------------------------------------------------------------
+s = d.slide("Who's on it", "Everyone sees who has each email, and what was done", (
+    "With more than one person on the inbox, two people must never answer the same email. Anyone can "
+    "take an email: their name shows next to it in the queue and it moves to their Mine view; an "
+    "admin can give an email to someone. Every email keeps a short history: who took it, who replied, "
+    "who marked it done. And when the AI got the topic or priority wrong, anyone can correct it in one "
+    "click; the email moves to the right place at once."))
+picture(s, "app/team-email.png", x=MARGIN, y=TOP - Inches(0.15), max_w=Inches(6), max_h=Inches(4.9))
+bullets(s, MARGIN + Inches(6.4), TOP + Inches(0.2), Inches(5.4), Inches(4.6), [
+    ("Take it. ", "Press Take (or A): your name is on it, it's under Mine."),
+    ("Hand it over. ", "An admin gives an email to anyone on the team."),
+    ("See the history. ", "Who took it, replied or marked it done, and when."),
+    ("Fix the AI. ", "Change the priority, topic or needs-a-reply in one click."),
+], size=17, spacing=14)
+
 # 8 ---------------------------------------------------------------------------------------------
 s = d.slide("On the go", "Works on the organiser's phone", (
     "Organisers are on their feet during an event, so the page works on a phone: one column at a "
-    "time, the filters as rows you swipe, and the open email with its buttons and reply box. Together "
+    "time, the views in a menu, and the open email with its buttons and reply box. Together "
     "with the Telegram alert for P1, the person on duty can handle urgent mail from the venue floor."))
 picture(s, "app/phone-list.png", x=MARGIN + Inches(0.4), y=TOP - Inches(0.1), max_w=Inches(2.6), max_h=Inches(4.95))
 picture(s, "app/phone-email.png", x=MARGIN + Inches(3.4), y=TOP - Inches(0.1), max_w=Inches(2.6), max_h=Inches(4.95))
 bullets(s, MARGIN + Inches(6.6), TOP + Inches(0.2), Inches(5.2), Inches(4.5), [
     ("One column at a time: ", "the queue, then the email."),
-    ("Filters you swipe: ", "views, mailbox, topic and sender."),
+    ("Views in a menu: ", "Needs reply, Mine, P1 and the rest."),
     ("Everything works: ", "reply, mark waiting or done."),
     ("Paired with alerts: ", "P1 email pings Telegram on your phone."),
 ], size=16)

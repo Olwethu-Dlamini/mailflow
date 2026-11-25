@@ -117,41 +117,42 @@ table(s, MARGIN, TOP + Inches(2.4), [Inches(4.4), Inches(2.6), Inches(1.7), Inch
 
 # 8 ---------------------------------------------------------------------------------------------
 s = d.slide("The web app", "A small FastAPI program in its own container", (
-    "The web app is about 700 lines of Python and one page of plain JavaScript, no build step. config "
-    "reads the settings, n8n.py talks to n8n's API and the Reply webhook, queue.py holds the views, "
-    "filters and the late rule, auth.py and store.py are logins and sessions in SQLite, web.py is the "
-    "HTTP layer. The browser only ever talks to the app; the n8n API key and the reply secret stay in "
-    "the container's settings file. 51 tests cover the rules, the n8n client and every route."))
+    "The web app is about 1,400 lines of Python and one page of plain JavaScript, no build step. config "
+    "reads the settings, n8n.py talks to n8n's API and the Reply webhook and keeps the list in memory, "
+    "queue.py holds the views, filters and the late rule, auth.py and store.py are logins, sessions, "
+    "who has which email and the activity log in SQLite, web.py is the HTTP layer. The browser only "
+    "ever talks to the app; the n8n API key and the reply secret stay in the container's settings file. "
+    "Python tests cover the rules, the n8n client and every route; browser tests drive the page in Chrome."))
 table(s, MARGIN, TOP - Inches(0.1), [Inches(2.6), Inches(9.23)], [
     ["File (app/src/mailflow/)", "Job"],
-    ["config.py", "Settings from /opt/mailflow/app/.env: n8n address and API key, reply secret, site origin, trusted proxy"],
-    ["n8n.py", "Reads rows (last 30 days, paged, 15 s cache), updates status, calls the Reply webhook"],
-    ["queue.py", "Views, Topic/Sender filters, sorting (P1 first, oldest first), the late rule (P1 4 h, P2 24 h)"],
-    ["auth.py · store.py", "scrypt passwords, sessions, lockout; SQLite in the mailflow_data volume"],
-    ["web.py", "Routes, security headers, the origin check, the 64 KB body limit, the http → https redirect"],
-    ["static/", "index.html, login.html, app.js, app.css: the page, text-only rendering of email content"],
+    ["config.py", "Settings from /opt/mailflow/app/.env: n8n address and API key, reply secret, site origin, trusted proxy, Google"],
+    ["n8n.py", "The 30-day list in memory (fresh 15 s, served while re-read up to 6 h), status and label changes, Reply"],
+    ["queue.py", "Views (incl. Mine), Topic/Sender filters, sorting (P1 first, oldest first), the late rule (P1 4 h, P2 24 h)"],
+    ["auth.py · store.py", "scrypt passwords, sessions, lockout, Google sign-in; assignments and activity; SQLite volume"],
+    ["web.py", "Routes, security headers, the origin check, the 64 KB body limit, the page with its data, hashed static files"],
+    ["static/", "The page: keyboard triage with Undo, instant views, text-only rendering of email content"],
     ["cli.py", "mailflow user add | reset | disable | enable | list (on the server)"],
 ], size=13, row_h=Inches(0.5))
 text(s, MARGIN, Inches(6.35), CONTENT_W, Inches(0.4),
-     "Tests: cd app && uv run pytest  (51 tests: queue rules, n8n client, auth and lockout, every route)", 13, MUTED)
+     "Tests: cd app && uv run pytest  (queue rules, n8n client, auth, every route, and the page in Chrome)", 13, MUTED)
 
 # 9 ---------------------------------------------------------------------------------------------
 s = d.slide("Journey 2: opening the page", "From the browser to the data and back", (
     "When someone opens the page, the browser connects to Cloudflare over HTTPS. Cloudflare sends it "
     "through the tunnel to srv1, where Caddy forwards it to ai port 3100. The app checks the session "
-    "cookie; without one it sends you to the login page. With one, it asks n8n's API for the last 30 "
-    "days of rows, at most 3,000, cached 15 seconds, and builds the queue: the view, the filters, the "
-    "sort order and the late markers. The page refreshes every 60 seconds and whenever you come back "
-    "to the tab."))
+    "cookie; without one it sends you to the login page. With one, it answers from the list it keeps in "
+    "memory (read from n8n's API at start-up and again in the background) and sends the page with the "
+    "account, the queue and the open email inside it, so the list shows after one round trip. The page "
+    "refreshes every 60 seconds and whenever you come back to the tab."))
 flow(s, TOP + Inches(0.1), [
     ("Browser", "https://mailflow.22112002.xyz; http is redirected to https."),
     ("Cloudflare", "HTTPS, then the tunnel to srv1. Adds Cf-Connecting-IP (the visitor)."),
     ("srv1 Caddy", "Forwards to ai 10.0.0.31:3100 on the LAN."),
-    ("App", "Session cookie? No → login page. Yes → continue."),
-    ("n8n API", "Rows of the last 30 days → queue: view, filters, P1 first, late."),
+    ("App", "Session cookie? No → login page. Yes → the page, with the queue inside."),
+    ("n8n API", "Read in the background: rows of the last 30 days, kept in memory."),
 ], h=Inches(3.0), body_size=13)
 bullets(s, MARGIN, TOP + Inches(3.4), CONTENT_W, Inches(1.4), [
-    "The page refreshes every 60 s and when you return to the tab; if a refresh fails it says since when the list is old.",
+    "Changes (status, who has it, labels) show at once and are saved in the background; a refused save reloads the list.",
     "Logins are counted per visitor: the app trusts Cf-Connecting-IP only on requests from srv1 (TRUSTED_PROXY=10.0.0.10).",
 ], size=14, spacing=6)
 
