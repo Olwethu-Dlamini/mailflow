@@ -130,7 +130,8 @@ async def fake_n8n(request: httpx.Request) -> httpx.Response:
     return httpx.Response(200, json={"data": found[: int(request.url.params.get("limit", "250"))], "nextCursor": None})
 
 
-def main() -> None:
+def build_app(port: int):
+    """The real app on made-up data, as served on 127.0.0.1:`port` (the browser tests use it too)."""
     web.REPLY_MAILBOXES[:] = ["hello@"]  # the demo's main mailbox gets the reply box, as gmail does for real
     db = Path(tempfile.mkdtemp()) / "demo.db"
     store = Store(str(db))
@@ -138,12 +139,15 @@ def main() -> None:
     store.add_user("thabo@mailflow.example", "Thabo Nkosi", auth.hash_password("demo-password-123"), is_admin=False)
     settings = Settings(
         n8n_url="http://demo", n8n_api_key="demo", table_id="demo", reply_url="http://demo/webhook/mailflow/reply",
-        reply_secret="demo", db_path=str(db), cookie_secure=False, trusted_proxy="", site_origin="http://127.0.0.1:8780",
+        reply_secret="demo", db_path=str(db), cookie_secure=False, trusted_proxy="", site_origin=f"http://127.0.0.1:{port}",
         google_client_id="demo.apps.googleusercontent.com", google_client_secret="demo",
     )
     engine = Engine(settings, transport=httpx.MockTransport(fake_n8n))
-    app = create_app(settings, engine, store, google=GoogleLogin(settings))
-    uvicorn.run(app, host="127.0.0.1", port=8780, log_level="warning")
+    return create_app(settings, engine, store, google=GoogleLogin(settings))
+
+
+def main() -> None:
+    uvicorn.run(build_app(8780), host="127.0.0.1", port=8780, log_level="warning")
 
 
 if __name__ == "__main__":
