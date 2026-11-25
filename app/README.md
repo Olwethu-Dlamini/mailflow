@@ -27,11 +27,22 @@ On a phone the sidebar is a drawer and one pane shows at a time.
 |---|---|---|---|
 | `J` / `K` | next / previous email | `E` | Done |
 | `/` | search the list | `W` | replied, waiting on the customer |
-| `1`–`5` | Needs reply, P1, Waiting, Done, Everything | `U` | reopen |
+| `1`–`6` | Needs reply, Mine, P1, Waiting, Done, Everything | `U` | reopen |
 | `Esc` | close the email | `R` | write a reply (`Ctrl`+`Enter` sends) |
 | `?` | all shortcuts | `Z` | undo the last status change |
+| | | `A` | take the email, or let yours go |
 
 Marking an email Done or Waiting opens the next one in the list, with Undo in the toast.
+
+**Who has it.** Anyone can take an email (Take, or `A`): their name shows on it in the queue and
+it is under their **Mine** view. Staff can only take an email nobody has, or let theirs go; an admin
+gives any email to anyone, or to nobody. Each email keeps its **activity**: who took it, replied,
+marked it or corrected it, and when. Both live in the app's SQLite file (`assignments`, `activity`),
+not in n8n, and are pruned 120 days on.
+
+**Correcting the AI.** The priority, topic and needs-a-reply labels on the open email are menus:
+a change is written to the n8n table, `sorted_by` becomes `person`, and the email moves to where it
+now belongs at once.
 
 ## Speed
 
@@ -115,7 +126,9 @@ export N8N_URL=http://ai:5678 N8N_API_KEY=… MAILFLOW_TABLE_ID=HwHXJgR6FLgD8aeS
        DB_PATH=/tmp/mailflow.db COOKIE_SECURE=false TRUSTED_PROXY=none SITE_ORIGIN=http://127.0.0.1:8770
 uv run mailflow user add --email you@example.com --name You --admin
 uv run uvicorn --factory mailflow.web:main_app --port 8770
-uv run pytest
+uv run pytest                     # everything; the browser tests skip without a Chrome
+uv run playwright install chromium   # once, for the browser tests (or MAILFLOW_CHROME=/path/to/chrome)
+uv run pytest tests/browser       # the page in Chrome against made-up emails (deck/demo_server.py)
 ```
 
 ## Deploy on `ai`
