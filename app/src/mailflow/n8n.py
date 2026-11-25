@@ -56,7 +56,8 @@ class Engine:
         self._clock = clock
         self._cache: tuple[float, list[dict]] | None = None
         self._reading: asyncio.Task | None = None
-        self._edits: dict[int, tuple[str, float]] = {}  # status changes, for a read that began before them
+        # Fields changed by the app (status, corrected labels), for a read that began before them.
+        self._edits: dict[int, tuple[dict, float]] = {}
 
     def _age(self) -> float | None:
         return None if self._cache is None else self._clock() - self._cache[0]
@@ -121,11 +122,11 @@ class Engine:
         if len(rows) >= ROW_CAP:
             log.warning("row cap %d reached: older emails in the last %d days are not listed", ROW_CAP, DAYS)
             rows = rows[:ROW_CAP]
-        # A status changed while this read was under way may be missing from what n8n sent.
+        # A change made while this read was under way may be missing from what n8n sent.
         for row in rows:
             edit = self._edits.get(row.get("id"))
             if edit and edit[1] >= started:
-                row["status"] = edit[0]
+                row.update(edit[0])
         self._edits = {k: v for k, v in self._edits.items() if v[1] >= started}
         self._cache = (self._clock(), rows)
         return rows
@@ -136,13 +137,14 @@ class Engine:
             return None
         return next((row for row in self._cache[1] if row.get("id") == row_id), None)
 
-    def _set_cached_status(self, match: Callable[[dict], bool], status: str) -> None:
-        # The change is already in n8n; the cached copy follows, so the list need not be read again,
-        # and a read already under way gets it re-applied (see _read).
+    def _changed(self, row_id: int, data: dict) -> None:
+        # The change is already in n8n; the row in memory follows, so the list need not be read
+        # again, and a read already under way gets it applied too (see _read).
         for row in self._cache[1] if self._cache else []:
-            if match(row):
-                row["status"] = status
-                self._edits[row.get("id")] = (status, self._clock())
+            if row.get("id") == row_id:
+                row.update(data)
+        earlier = self._edits.get(row_id, ({}, 0.0))[0]
+        self._edits[row_id] = ({**earlier, **data}, self._clock())
 
     async def get_row(self, row_id: int) -> dict | None:
         """One row: from the cached list when it is there (it holds the whole row), else from n8n."""
@@ -157,10 +159,13 @@ class Engine:
     async def set_status(self, row_id: int, to: str) -> None:
         if to not in STATUSES:
             raise ValueError(f"unknown status {to!r}")
-        payload = {"filter": json.loads(_filter("id", "eq", row_id)), "data": {"status": to}}
+        await self.set_fields(row_id, {"status": to})
+
+    async def set_fields(self, row_id: int, data: dict) -> None:
+        """Change columns of one row in n8n (the caller checks the values)."""
+        payload = {"filter": json.loads(_filter("id", "eq", row_id)), "data": data}
         await self._call("PATCH", f"{self._rows_url}/update", json=payload, headers=self._headers)
-        self._set_cached_status(lambda row: row.get("id") == row_id, to)
-        self._edits[row_id] = (to, self._clock())
+        self._changed(row_id, data)
 
     async def send_reply(self, row_id: int, message_id: str, text: str) -> str:
         """Ask MailFlow · Reply to answer the email in Gmail. Returns 'sent', 'cannot' or 'not_found'."""
@@ -176,9 +181,8 @@ class Engine:
             result = None
         if result not in REPLY_RESULTS:
             raise EngineDown("the Reply workflow answered something unexpected")
-        if result == "sent":  # MailFlow · Reply sets the row to waiting
-            self._set_cached_status(lambda row: row.get("id") == row_id, "waiting")
-            self._edits[row_id] = ("waiting", self._clock())  # also when the row is not in memory yet
+        if result == "sent":  # MailFlow · Reply sets the row to waiting; also when it is not in memory yet
+            self._changed(row_id, {"status": "waiting"})
         return result
 
 

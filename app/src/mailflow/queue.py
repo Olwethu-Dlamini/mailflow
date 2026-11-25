@@ -12,7 +12,7 @@ TOPICS = [
     "Platform notification", "Marketing", "Other",
 ]
 SENDERS = ["Participant", "Sponsor", "Mentor/Judge", "Volunteer", "Vendor/Venue", "Press", "Organiser", "Automated", "Other"]
-VIEWS = ["reply", "p1", "waiting", "done", "all"]
+VIEWS = ["reply", "mine", "p1", "waiting", "done", "all"]
 LATE_AFTER_HOURS = {"P1": 4, "P2": 24}
 PRIORITY_RANK = {"P1": 0, "P2": 1, "P3": 2}
 ITEM_FIELDS = (
@@ -55,8 +55,9 @@ def _age_text(hours: float) -> str:
     return f"{round(hours / 24)} days"
 
 
-def _item(row: dict, now: float) -> dict:
+def _item(row: dict, now: float, assigned: dict[int, int]) -> dict:
     item = {field: row.get(field) for field in ITEM_FIELDS}
+    item["assignee"] = assigned.get(row.get("id"))
     status = status_of(row)
     received = _received(row)
     hours = (now - received) / 3600 if received else -1
@@ -75,11 +76,18 @@ def _counted(rows: list[dict], key: str, values: list[str]) -> list[list]:
     return [[value, sum(1 for r in rows if r.get(key) == value)] for value in values]
 
 
-def build(rows: list[dict], view: str, mailbox: str, topic: str, sender: str, now: datetime) -> dict:
-    view = view if view in IN_VIEW else "reply"
+def build(
+    rows: list[dict], view: str, mailbox: str, topic: str, sender: str, now: datetime,
+    assigned: dict[int, int] | None = None, me: int | None = None,
+) -> dict:
+    """The list for one view and filters. `assigned` maps row id → user id; `me` is who is asking,
+    for the Mine view (my emails that are not done)."""
+    assigned = assigned or {}
+    in_view = {**IN_VIEW, "mine": lambda r: me is not None and assigned.get(r.get("id")) == me and status_of(r) != "done"}
+    view = view if view in in_view else "reply"
     chosen = [
         r for r in rows
-        if IN_VIEW[view](r)
+        if in_view[view](r)
         and (not mailbox or r.get("mailbox") == mailbox)
         and (not topic or r.get("type") == topic)
         and (not sender or r.get("sender") == sender)
@@ -92,10 +100,10 @@ def build(rows: list[dict], view: str, mailbox: str, topic: str, sender: str, no
     mailboxes = sorted({r.get("mailbox") for r in rows if r.get("mailbox")})
     return {
         "view": view,
-        "counts": {name: sum(1 for r in rows if IN_VIEW[name](r)) for name in VIEWS},
+        "counts": {name: sum(1 for r in rows if in_view[name](r)) for name in VIEWS},
         "total": len(rows),
         "mailboxes": _counted(rows, "mailbox", mailboxes),
         "topics": _counted(rows, "type", [t for t in TOPICS if any(r.get("type") == t for r in rows)]),
         "senders": _counted(rows, "sender", [s for s in SENDERS if any(r.get("sender") == s for r in rows)]),
-        "items": [_item(r, stamp) for r in chosen],
+        "items": [_item(r, stamp, assigned) for r in chosen],
     }

@@ -133,18 +133,20 @@ async def test_a_failed_background_read_keeps_serving_the_list():
     assert [r["id"] for r in await e.recent_rows()] == [1]
 
 
-async def test_a_status_change_during_a_background_read_is_not_lost():
+async def test_changes_made_during_a_background_read_are_not_lost():
     clock = [0.0]
     release = asyncio.Event()
     reads = 0
+    patches = []
 
     async def handler(request):
         nonlocal reads
         if request.method == "GET":
             reads += 1
             if reads == 2:
-                await release.wait()  # n8n answers with the status it had when the read began
-            return httpx.Response(200, json={"data": [{"id": 1, "status": "open"}], "nextCursor": None})
+                await release.wait()  # n8n answers with what it had when the read began
+            return httpx.Response(200, json={"data": [{"id": 1, "status": "open", "priority": "P3"}], "nextCursor": None})
+        patches.append(json.loads(request.content)["data"])
         return httpx.Response(200, json=True)
 
     e = engine(handler, clock=lambda: clock[0])
@@ -154,9 +156,12 @@ async def test_a_status_change_during_a_background_read_is_not_lost():
     await asyncio.sleep(0)
     clock[0] = 21.0
     await e.set_status(1, "done")
+    await e.set_fields(1, {"priority": "P1", "sorted_by": "person"})
     release.set()
     await e._reading
-    assert (await e.recent_rows())[0]["status"] == "done"
+    row = (await e.recent_rows())[0]
+    assert (row["status"], row["priority"], row["sorted_by"]) == ("done", "P1", "person")
+    assert patches == [{"status": "done"}, {"priority": "P1", "sorted_by": "person"}]
 
 
 async def test_an_email_in_the_cached_list_opens_without_asking_n8n():

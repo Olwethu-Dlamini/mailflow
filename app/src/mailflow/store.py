@@ -1,6 +1,7 @@
-"""Accounts, sessions and failed logins, in the app's own SQLite file.
+"""Accounts, sessions and failed logins, and the team's own notes on each email (who has it, who
+did what), in the app's own SQLite file.
 
-Email lives in n8n's data table; this file holds only who may log in.
+The email itself lives in n8n's data table; rows here refer to it by its row id.
 """
 
 import sqlite3
@@ -33,7 +34,21 @@ CREATE TABLE IF NOT EXISTS google_starts (
     nonce TEXT NOT NULL,
     created_at REAL NOT NULL
 );
+CREATE TABLE IF NOT EXISTS assignments (
+    row_id INTEGER PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS activity (
+    id INTEGER PRIMARY KEY,
+    row_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL REFERENCES users(id),
+    at REAL NOT NULL,
+    text TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS activity_row ON activity(row_id, at);
 """
+NOTES_SECONDS = 120 * 24 * 3600  # n8n deletes emails after 90 days; notes on them go a month later
 # Added after the first release: an existing users table gets the column on start.
 GOOGLE_SUB = "ALTER TABLE users ADD COLUMN google_sub TEXT"
 GOOGLE_SUB_INDEX = "CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL"
@@ -156,11 +171,40 @@ class Store:
     def forget_failures(self, key: str) -> None:
         self._run("DELETE FROM login_failures WHERE key = ?", (key,))
 
-    def prune(self, failures_before: float, sessions_before: float) -> None:
-        """Drop failed logins, sessions and abandoned Google sign-ins too old to matter."""
+    def prune(self, failures_before: float, sessions_before: float, notes_before: float) -> None:
+        """Drop failed logins, sessions, abandoned Google sign-ins and notes too old to matter."""
         self._run("DELETE FROM login_failures WHERE at < ?", (failures_before,))
         self._run("DELETE FROM sessions WHERE created_at < ?", (sessions_before,))
         self._run("DELETE FROM google_starts WHERE created_at < ?", (failures_before,))
+        self._run("DELETE FROM assignments WHERE at < ?", (notes_before,))
+        self._run("DELETE FROM activity WHERE at < ?", (notes_before,))
+
+    # who has which email, and what was done to it
+
+    def assignments(self) -> dict[int, int]:
+        return {row["row_id"]: row["user_id"] for row in self._run("SELECT row_id, user_id FROM assignments")}
+
+    def assignee(self, row_id: int) -> int | None:
+        rows = self._run("SELECT user_id FROM assignments WHERE row_id = ?", (row_id,))
+        return rows[0]["user_id"] if rows else None
+
+    def set_assignee(self, row_id: int, user_id: int | None, now: float) -> None:
+        if user_id is None:
+            self._run("DELETE FROM assignments WHERE row_id = ?", (row_id,))
+        else:
+            self._run("INSERT OR REPLACE INTO assignments VALUES (?, ?, ?)", (row_id, user_id, now))
+
+    def add_activity(self, row_id: int, user_id: int, text: str, now: float) -> None:
+        self._run("INSERT INTO activity (row_id, user_id, at, text) VALUES (?, ?, ?, ?)", (row_id, user_id, now, text))
+
+    def activity(self, row_id: int, limit: int = 50) -> list[dict]:
+        """Newest first, with the name of whoever did it."""
+        rows = self._run(
+            "SELECT a.at, a.text, u.name FROM activity a JOIN users u ON u.id = a.user_id"
+            " WHERE a.row_id = ? ORDER BY a.at DESC, a.id DESC LIMIT ?",
+            (row_id, limit),
+        )
+        return [{"at": row["at"], "name": row["name"], "text": row["text"]} for row in rows]
 
     # Google sign-in in progress: one row per click on "Continue with Google", used once
 

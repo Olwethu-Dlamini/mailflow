@@ -72,7 +72,17 @@ def test_views_select_the_right_rows():
     assert ids(build(rows, "waiting", "", "", "", NOW)) == [2]
     assert ids(build(rows, "done", "", "", "", NOW)) == [1]
     assert ids(build(rows, "reply", "", "", "", NOW)) == [4]
-    assert build(rows, "reply", "", "", "", NOW)["counts"] == {"reply": 1, "p1": 1, "waiting": 1, "done": 1, "all": 4}
+    assert build(rows, "reply", "", "", "", NOW)["counts"] == {"reply": 1, "mine": 0, "p1": 1, "waiting": 1, "done": 1, "all": 4}
+
+
+def test_mine_is_my_assigned_emails_that_are_not_done_sorted_like_the_queue():
+    rows = [row(1, "P2", hours_ago=5), row(2, "P1", hours_ago=1), row(3, status="done"), row(4)]
+    assigned = {1: 7, 2: 7, 3: 7, 4: 8}
+    inbox = build(rows, "mine", "", "", "", NOW, assigned, me=7)
+    assert ids(inbox) == [2, 1]
+    assert inbox["counts"]["mine"] == 2
+    assert [item["assignee"] for item in inbox["items"]] == [7, 7]
+    assert ids(build(rows, "mine", "", "", "", NOW, assigned, me=9)) == []
 
 
 def test_unknown_view_falls_back_to_needs_reply():

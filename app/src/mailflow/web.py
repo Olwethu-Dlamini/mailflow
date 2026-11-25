@@ -16,7 +16,7 @@ from pathlib import Path
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, StrictBool
 
 from . import auth, config, queue
 from .google import CALLBACK_PATH, GoogleLogin, GoogleRefused
@@ -67,6 +67,21 @@ class StatusChange(BaseModel):
 
 class Reply(BaseModel):
     text: str
+
+
+class Assign(BaseModel):
+    user_id: int | None  # None: nobody has it
+
+
+class Labels(BaseModel):
+    """A person's correction of what the AI decided; only the fields sent change."""
+    type: str | None = None
+    priority: str | None = None
+    needs_reply: StrictBool | None = None
+
+
+STATUS_DONE_TEXT = {"open": "reopened it", "waiting": "marked it Waiting on customer", "done": "marked it Done"}
+PRIORITIES = ("P1", "P2", "P3")
 
 
 class NewUser(BaseModel):
@@ -210,7 +225,7 @@ def create_app(
         q = request.query_params
         boot = {"me": _user_json(user), "google": google is not None}
         if engine.ready:
-            boot["inbox"] = await _inbox_json(q.get("view", "reply"), q.get("mailbox", ""), q.get("topic", ""), q.get("sender", ""))
+            boot["inbox"] = await _inbox_json(q.get("view", "reply"), q.get("mailbox", ""), q.get("topic", ""), q.get("sender", ""), user)
             row = engine.cached_row(int(q["id"])) if q.get("id", "").isdigit() else None
             if row is not None:
                 boot["email"] = _email_json(row)
@@ -317,12 +332,14 @@ def create_app(
 
     # email
 
-    async def _inbox_json(view: str, mailbox: str, topic: str, sender: str) -> dict:
+    async def _inbox_json(view: str, mailbox: str, topic: str, sender: str, user: User) -> dict:
         rows = await engine.recent_rows()
-        result = queue.build(rows, view, mailbox, topic, sender, datetime.now(UTC))
+        result = queue.build(rows, view, mailbox, topic, sender, datetime.now(UTC), store.assignments(), user.id)
         result["reply_mailboxes"] = REPLY_MAILBOXES
         # An older list served while a fresh one is read: the page asks again in a moment.
         result["stale"] = engine.stale
+        # Who can hold an email (names for the avatars in the list, and for an admin's choice).
+        result["people"] = [{"id": u.id, "name": u.name} for u in store.list_users() if u.active]
         return result
 
     def _email_json(row: dict) -> dict:
@@ -331,11 +348,15 @@ def create_app(
             "status": queue.status_of(row),
             "needs_reply": queue.needs_reply(row),
             "can_reply": row.get("mailbox") in REPLY_MAILBOXES,
+            "assignee": store.assignee(row["id"]),
         }
+
+    def _note(row_id: int, user: User, text: str) -> None:
+        store.add_activity(row_id, user.id, text, clock())
 
     @app.get("/api/inbox")
     async def inbox(view: str = "reply", mailbox: str = "", topic: str = "", sender: str = "", user: User = Depends(current_user)):
-        return await _inbox_json(view, mailbox, topic, sender)
+        return await _inbox_json(view, mailbox, topic, sender, user)
 
     async def _row(row_id: int) -> dict:
         row = await engine.get_row(row_id)
@@ -353,6 +374,7 @@ def create_app(
             raise ApiError(400, "Unknown status.")
         await _row(row_id)
         await engine.set_status(row_id, body.to)
+        _note(row_id, user, STATUS_DONE_TEXT[body.to])
         log.info("%s set email %d to %s", user.email, row_id, body.to)
         return {"status": body.to}
 
@@ -369,8 +391,61 @@ def create_app(
             raise ApiError(404, "Not sent: this email could not be found in Gmail.")
         if result == "cannot":
             raise ApiError(400, "Not sent: n8n refused this reply.")
+        _note(row_id, user, "sent a reply")
         log.info("%s replied to email %d", user.email, row_id)
         return {"result": "sent"}
+
+    @app.get("/api/emails/{row_id}/activity")
+    def activity(row_id: int, user: User = Depends(current_user)):
+        return store.activity(row_id)
+
+    @app.post("/api/emails/{row_id}/assign")
+    async def assign(row_id: int, body: Assign, user: User = Depends(current_user)):
+        current = store.assignee(row_id)
+        # Staff take an email or let theirs go; giving one away, or taking someone else's, is an admin's.
+        if not user.is_admin and (body.user_id not in (None, user.id) or current not in (None, user.id)):
+            raise ApiError(403, "Only an admin can give an email to someone, or take one someone else has.")
+        target = store.user_by_id(body.user_id) if body.user_id is not None else None
+        if body.user_id is not None and (target is None or not target.active):
+            raise ApiError(400, "That account does not exist or is disabled.")
+        await _row(row_id)
+        if body.user_id == current:
+            return {"assignee": current}
+        store.set_assignee(row_id, body.user_id, clock())
+        if target is not None:
+            text = "took it" if target.id == user.id else f"gave it to {target.name}"
+        else:
+            holder = store.user_by_id(current)
+            text = "let it go" if current == user.id else f"took it off {holder.name if holder else 'someone'}"
+        _note(row_id, user, text)
+        return {"assignee": body.user_id}
+
+    @app.post("/api/emails/{row_id}/labels")
+    async def labels(row_id: int, body: Labels, user: User = Depends(current_user)):
+        if body.type is not None and body.type not in queue.TOPICS:
+            raise ApiError(400, "Unknown topic.")
+        if body.priority is not None and body.priority not in PRIORITIES:
+            raise ApiError(400, "Priority is P1, P2 or P3.")
+        row = await _row(row_id)
+        changes, said = {}, []
+        if body.priority is not None and body.priority != row.get("priority"):
+            changes["priority"] = body.priority
+            said.append(f"the priority from {row.get('priority') or 'none'} to {body.priority}")
+        if body.type is not None and body.type != row.get("type"):
+            changes["type"] = body.type
+            said.append(f"the topic to {body.type}")
+        if body.needs_reply is not None and body.needs_reply != queue.needs_reply(row):
+            changes["needs_reply"] = body.needs_reply
+        if not changes:
+            raise ApiError(400, "Nothing to change.")
+        # From now on the labels are a person's, not the AI's.
+        await engine.set_fields(row_id, {**changes, "sorted_by": "person"})
+        text = f"changed {', '.join(said)}" if said else ""
+        if "needs_reply" in changes:
+            reply_text = "marked it as needing a reply" if changes["needs_reply"] else "marked it as needing no reply"
+            text = f"{text}, and {reply_text}" if text else reply_text
+        _note(row_id, user, text)
+        return _email_json(await _row(row_id))
 
     # accounts (admins)
 

@@ -1,3 +1,4 @@
+import copy
 import json
 import re
 
@@ -33,8 +34,10 @@ ROWS = [
 
 class FakeEngine:
     def __init__(self):
+        self.rows = copy.deepcopy(ROWS)
         self.down = False
         self.statuses = []
+        self.fields = []
         self.replies = []
         self.reply_result = "sent"
         self.stale = False
@@ -44,7 +47,7 @@ class FakeEngine:
         pass
 
     def cached_row(self, row_id):
-        return next((r for r in ROWS if r["id"] == row_id), None) if self.ready else None
+        return next((r for r in self.rows if r["id"] == row_id), None) if self.ready else None
 
     def _check(self):
         if self.down:
@@ -52,15 +55,20 @@ class FakeEngine:
 
     async def recent_rows(self):
         self._check()
-        return ROWS
+        return self.rows
 
     async def get_row(self, row_id):
         self._check()
-        return next((r for r in ROWS if r["id"] == row_id), None)
+        return next((r for r in self.rows if r["id"] == row_id), None)
 
     async def set_status(self, row_id, to):
         self._check()
         self.statuses.append((row_id, to))
+
+    async def set_fields(self, row_id, data):
+        self._check()
+        self.fields.append((row_id, data))
+        next(r for r in self.rows if r["id"] == row_id).update(data)
 
     async def send_reply(self, row_id, message_id, text):
         self._check()

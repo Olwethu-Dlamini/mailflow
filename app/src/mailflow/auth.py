@@ -17,7 +17,7 @@ import hmac
 import secrets
 
 from .google import Identity
-from .store import Store, User, normal_email
+from .store import NOTES_SECONDS, Store, User, normal_email
 
 MIN_PASSWORD = 12
 LOCK_AFTER = 5
@@ -87,7 +87,7 @@ def login(store: Store, email: str, password: str, client_ip: str, now: float) -
     """Returns (session token, user) or raises LoginRefused."""
     email = normal_email(email)
     email_key, ip_key = f"email:{email}", f"ip:{client_ip}"
-    store.prune(failures_before=now - 24 * 3600, sessions_before=now - MAX_SECONDS)
+    _prune(store, now)
     _check_not_locked(store, email_key, ip_key, now)
 
     user = store.user_by_email(email)
@@ -119,9 +119,13 @@ def google_resume(store: Store, state: str, now: float) -> tuple[str, str] | Non
     return store.take_google_start(_token_hash(state), now - GOOGLE_START_SECONDS)
 
 
+def _prune(store: Store, now: float) -> None:
+    store.prune(failures_before=now - 24 * 3600, sessions_before=now - MAX_SECONDS, notes_before=now - NOTES_SECONDS)
+
+
 def google_login(store: Store, identity: Identity, now: float) -> tuple[str, User]:
     """Returns (session token, user) or raises LoginRefused."""
-    store.prune(failures_before=now - 24 * 3600, sessions_before=now - MAX_SECONDS)
+    _prune(store, now)
     user = store.user_by_google_sub(identity.sub)
     if user is None:
         # First Google sign-in: the verified email finds the account, unless another Google account
