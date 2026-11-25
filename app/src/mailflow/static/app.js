@@ -4,6 +4,7 @@
 
 const VIEWS = [
   ["reply", "Needs reply", "reply"],
+  ["mine", "Mine", "user"],
   ["p1", "P1 · answer today", "flame"],
   ["waiting", "Waiting on customer", "clock"],
   ["done", "Done", "check"],
@@ -16,6 +17,7 @@ const SORTED_BY = {
   ai: "Sorted by AI",
   rule: "Sorted by a rule",
   unsorted: "Not sorted: the AI's answer was unusable, so the labels below are placeholders",
+  person: "Sorted by AI, corrected by a person",
 };
 // [to, label, class, icon, shortcut, tooltip] for each state an email can be in
 const BUTTONS = {
@@ -57,6 +59,9 @@ const ICONS = {
   undo: ["M3 7v6h6", "M21 17a9 9 0 0 0-15-6.7L3 13"],
   info: ["M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z", "M12 16v-4", "M12 8h.01"],
   keyboard: ["M4 5h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z", "M6 9h.01", "M10 9h.01", "M14 9h.01", "M18 9h.01", "M8 15h8"],
+  user: ["M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2", "M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"],
+  userPlus: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", "M19 8v6", "M22 11h-6"],
+  pencil: ["M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"],
 };
 const SVG = "http://www.w3.org/2000/svg";
 
@@ -469,7 +474,16 @@ function row(item, ctx) {
         item.sender ? el("span", { class: "chip role", text: item.sender }) : null,
         // the state only where a view mixes them
         ctx.mixed && item.status !== "open" ? el("span", { class: `chip st ${item.status}`, text: STATUS_TEXT[item.status] }) : null,
-        ctx.hideBox ? null : el("span", { class: "boxname" }, el("span", { class: `dot ${colourOf(item.mailbox)}` }), item.mailbox || ""))));
+        ctx.hideBox ? null : el("span", { class: "boxname" }, el("span", { class: `dot ${colourOf(item.mailbox)}` }), item.mailbox || ""),
+        item.assignee ? holder(item.assignee) : null)));
+}
+
+// A small avatar for whoever has the email, "You" for your own.
+function holder(userId) {
+  const name = personName(userId);
+  const mine = userId === me?.id;
+  return el("span", { class: mine ? "holder mine" : "holder", title: mine ? "You have it" : `${name} has it` },
+    avatar(name, "xs"), mine ? "You" : name.split(" ")[0]);
 }
 
 // Long lists render a page of rows at a time: the next page is added when the reader scrolls near
@@ -581,6 +595,30 @@ function statusButtons(email) {
       icon(iconName), label, el("kbd", { text: key })));
 }
 
+// Who has it: staff Take an email or Let go of theirs (key A); an admin picks anyone, or nobody.
+function assignControl(email) {
+  const current = assigneeOf(email);
+  if (me.is_admin) {
+    const select = el("select", {
+      "aria-label": "Who has it", onchange: (event) => assign(email.id, event.target.value ? Number(event.target.value) : null),
+    },
+      el("option", { value: "", text: "Nobody", selected: current === null }),
+      inbox.people.map((person) => el("option", { value: String(person.id), selected: person.id === current, text: person.id === me.id ? `${person.name} (you)` : person.name })));
+    return el("span", { class: current ? "pick on assign" : "pick assign", title: "Who has it  A" },
+      current ? avatar(personName(current), "xs") : icon("userPlus"),
+      el("span", { text: current ? (current === me.id ? "You" : personName(current)) : "Assign" }), icon("chevronDown"), select);
+  }
+  if (current === null) {
+    return el("button", { type: "button", class: "btn", title: "Take it: it shows under Mine", onclick: () => assign(email.id, me.id) },
+      icon("userPlus"), "Take", el("kbd", { text: "A" }));
+  }
+  if (current === me.id) {
+    return el("button", { type: "button", class: "btn", title: "Let it go: nobody has it then", onclick: () => assign(email.id, null) },
+      avatar(me.name, "xs"), "Yours · let go", el("kbd", { text: "A" }));
+  }
+  return el("span", { class: "holder big", title: `${personName(current)} has it; an admin can give it to someone else` },
+    avatar(personName(current), "xs"), personName(current));
+}
 function detailBar(email) {
   const arrow = (step, iconName, label, key) => {
     const id = neighbour(step);
@@ -594,6 +632,8 @@ function detailBar(email) {
     el("span", { class: "nav-arrows" }, arrow(-1, "chevronUp", "Previous email", "K"), arrow(1, "chevronDown", "Next email", "J")),
     email ? el("span", { class: `chip st ${email.status}`, text: STATUS_TEXT[email.status] || email.status }) : null,
     el("span", { class: "spacer" }),
+    email ? assignControl(email) : null,
+    email ? el("span", { class: "divider" }) : null,
     email ? statusButtons(email) : null);
 }
 
@@ -657,9 +697,50 @@ async function renderDetail() {
   detail.dataset.id = s.id;
   openEmail = email;
   detail.replaceChildren(...emailView(email, { draft: keepDraft, enter: fresh && !(preview && listed) }));
+  if (fresh) loadActivity(s.id);
   // J and K (and E, which opens the next one) will want these.
   prefetch(neighbour(1));
   prefetch(neighbour(-1));
+}
+
+// A label that is also a menu: what the AI chose, which a person can change (a native <select>
+// laid over the chip does the choosing).
+function labelPick(cls, text, label, options, current, onpick) {
+  const select = el("select", { "aria-label": label, onchange: (event) => onpick(event.target.value) },
+    options.map(([value, name]) => el("option", { value, text: name, selected: value === current })));
+  return el("span", { class: `${cls} editable`, title: `${label}: change it if the AI got it wrong` }, text, select);
+}
+
+function labelPicks(email) {
+  const reply = email.needs_reply ? "yes" : "no";
+  return [
+    labelPick(`prio ${email.priority || ""}`, email.priority || "–", "Priority",
+      ["P1", "P2", "P3"].map((p) => [p, p]), email.priority, (value) => relabel(email.id, { priority: value })),
+    labelPick(`chip topic ${TOPIC_CLASS[email.type] || ""}`, email.type || "No topic", "Topic",
+      (inbox?.all_topics || []).map((t) => [t, t]), email.type, (value) => relabel(email.id, { type: value })),
+    labelPick("chip", email.needs_reply ? "Needs a reply" : "No reply needed", "Needs a reply",
+      [["yes", "Needs a reply"], ["no", "No reply needed"]], reply, (value) => relabel(email.id, { needs_reply: value === "yes" })),
+  ];
+}
+
+// Who did what to the email, newest first (loaded each time it is opened, and after a change).
+const activityCache = new Map();
+function activityView(id) {
+  const entries = activityCache.get(id);
+  return el("section", { class: "activity", id: "activity", "aria-label": "Activity" },
+    el("h2", { text: "Activity" }),
+    !entries ? el("p", { class: "muted small", text: "Loading…" })
+      : !entries.length ? el("p", { class: "muted small", text: "Nobody has done anything with it yet." })
+        : el("ol", {}, entries.map((entry) => el("li", {},
+          avatar(entry.name, "xs"),
+          el("span", {}, el("b", { text: entry.name }), ` ${entry.text}`),
+          el("time", { text: showTime(entry.at * 1000, listTime) })))));
+}
+async function loadActivity(id) {
+  const entries = await api(`/api/emails/${encodeURIComponent(id)}/activity`).catch(() => null);
+  if (!entries) return;
+  activityCache.set(id, entries);
+  if (state().id === id) $("activity")?.replaceWith(activityView(id));
 }
 
 // The open email: the action bar, then subject and labels, the AI card, the message and the reply
@@ -677,11 +758,12 @@ function emailView(email, { loading = false, draft = "", enter = false } = {}) {
     el("article", { class: enter ? "detail-body enter" : "detail-body" },
       el("h1", { class: "detail-subject", text: email.subject || "(no subject)" }),
       el("div", { class: "chips detail-tags" },
-        email.priority ? el("span", { class: `prio ${email.priority}`, text: email.priority }) : null,
-        email.type ? el("span", { class: `chip topic ${TOPIC_CLASS[email.type] || ""}`.trim(), text: email.type }) : null,
+        loading ? [
+          email.priority ? el("span", { class: `prio ${email.priority}`, text: email.priority }) : null,
+          email.type ? el("span", { class: `chip topic ${TOPIC_CLASS[email.type] || ""}`.trim(), text: email.type }) : null,
+        ] : labelPicks(email),
         email.sender ? el("span", { class: "chip role", text: email.sender }) : null,
-        el("span", { class: "boxname" }, el("span", { class: `dot ${colourOf(email.mailbox)}` }), email.mailbox || ""),
-        el("span", { class: "chip", text: email.needs_reply ? "Needs a reply" : "No reply needed" })),
+        el("span", { class: "boxname" }, el("span", { class: `dot ${colourOf(email.mailbox)}` }), email.mailbox || "")),
       el("section", { class: unsorted ? "ai unsorted" : "ai", "aria-label": "What the AI made of it" },
         el("div", { class: "ai-label" }, icon(unsorted ? "warning" : "sparkles"), SORTED_BY[email.sorted_by] || SORTED_BY.ai),
         el("p", { class: "summary", text: email.summary || "" }),
@@ -697,7 +779,8 @@ function emailView(email, { loading = false, draft = "", enter = false } = {}) {
             el("div", { class: "muted small", text: `to ${email.mailbox || ""}` })),
           el("span", { class: "when", text: showTime(email.received_at, fullTime) })),
         text),
-      loading ? null : replyBox(email, draft)),
+      loading ? null : replyBox(email, draft),
+      activityView(String(email.id))),
   ];
 }
 
@@ -731,6 +814,7 @@ function replyBox(email, draft) {
         text.value = "";
         toast("Reply sent. The email is now waiting on the customer.");
         await render();
+        loadActivity(String(email.id));
       } catch (error) {
         toast(error.message, true);
       } finally {
@@ -751,6 +835,7 @@ function replyBox(email, draft) {
 // email at once instead of waiting for the server.
 const IN_VIEW = {
   reply: (item) => item.needs_reply && item.status === "open",
+  mine: (item) => item.assignee === me?.id && item.status !== "done",
   p1: (item) => item.priority === "P1" && item.status !== "done",
   waiting: (item) => item.status === "waiting",
   done: (item) => item.status === "done",
@@ -780,15 +865,16 @@ function runUndo() {
   }
 }
 
-// Change the lists on the page now, the one on screen and every kept one: the status, the counts,
-// and the row leaving a view it no longer belongs to or joining one it now belongs to, in the
-// server's order. `known` is the email as last seen, for one no longer on screen (Undo).
-// Returns the email after the change.
-function applyLocally(id, to, known = null) {
+// Change the lists on the page now, the one on screen and every kept one: the counts, and the row
+// updated, leaving a view it no longer belongs to, or joining one it now belongs to, in the
+// server's order. `patch` holds the fields that change (status, assignee, labels); `known` is the
+// email as last seen, for one no longer on screen (Undo). Returns the email after the change.
+function applyLocally(id, patch, known = null) {
   const listed = inbox?.items.find((item) => item.id === id) || known;
   if (!listed) return null;
   const was = { ...listed };
-  const now = { ...listed, status: to, ...(to === "open" ? {} : { waiting: "", late: false }) };
+  const now = { ...listed, ...patch };
+  if (patch.status && patch.status !== "open") Object.assign(now, { waiting: "", late: false });
   for (const [key, list] of new Map([...lists, [listKey(state()), inbox]])) {
     for (const [view, inView] of Object.entries(IN_VIEW)) list.counts[view] += (inView(now) ? 1 : 0) - (inView(was) ? 1 : 0);
     placeRow(key, list, now);
@@ -798,37 +884,34 @@ function applyLocally(id, to, known = null) {
   return now;
 }
 
-// Put one email where it now belongs in one list: updated, gone, or inserted in order.
+// Put one email where it now belongs in one list: in its place, gone, or inserted in order.
 function placeRow(key, list, now) {
   const at = list.items.findIndex((item) => item.id === now.id);
-  const belongs = (IN_VIEW[list.view] || IN_VIEW.all)(now) && passesFilters(key, now);
-  if (at >= 0 && belongs) Object.assign(list.items[at], { status: now.status, waiting: now.waiting, late: now.late });
-  else if (at >= 0) list.items.splice(at, 1);
-  else if (belongs) {
-    const place = list.items.findIndex((other) => comesBefore(list.view, now, other));
-    list.items.splice(place < 0 ? list.items.length : place, 0, { ...now });
-  }
+  if (at >= 0) list.items.splice(at, 1);
+  if (!((IN_VIEW[list.view] || IN_VIEW.all)(now) && passesFilters(key, now))) return;
+  const place = list.items.findIndex((other) => comesBefore(list.view, now, other));
+  list.items.splice(place < 0 ? list.items.length : place, 0, { ...now });
 }
 const recentChanges = []; // the last changes made here, for lists that were on their way meanwhile
 
-// Change an email's status. The page changes at once (as Superhuman and Front do): the email leaves
-// the view, the next one opens, and Undo is offered. The server is told in the background; if it
-// refuses, the list is loaded again so the page shows the truth.
+// Change an email on the page at once, then tell the server in the background (as Superhuman and
+// Front do). If the email leaves the view and it was open, the next one opens. Saves for one email
+// go one after another, and no list is fetched while a save is under way (it would show the old
+// state); if the server refuses, the list is loaded again so the page shows the truth.
 let pending = 0;
 const saving = new Map(); // email id → its last save, which the next one waits for
-async function setStatus(id, to, { quiet = false, known = null } = {}) {
+async function change(id, patch, path, body, known = null) {
   const listed = inbox?.items.find((item) => item.id === id) || known;
-  const before = listed?.status ?? (openEmail?.id === id ? openEmail.status : undefined);
   const wasOpen = state().id === String(id);
-  const leaves = Boolean(listed && inbox) && !(IN_VIEW[inbox.view] || IN_VIEW.all)({ ...listed, status: to });
+  const leaves = Boolean(listed && inbox) && !(IN_VIEW[inbox.view] || IN_VIEW.all)({ ...listed, ...patch });
   const next = wasOpen && leaves ? neighbour(1) || neighbour(-1) || "" : null;
 
-  const change = applyLocally(id, to, known);
-  setCachedStatus(id, to);
-  if (openEmail?.id === id) openEmail.status = to;
+  const now = applyLocally(id, patch, known);
+  emails.get(String(id))?.then((email) => Object.assign(email, patch), () => {});
+  if (openEmail?.id === id) Object.assign(openEmail, patch);
   inboxToken += 1; // a list already on its way predates this change: drop it
   statusChanges += 1; // likewise the other views being loaded ahead
-  // The row leaves and the next email opens as one short animation (the next email shows from
+  // The row moves and the next email opens as one short animation (the next email shows from
   // what the list knows, synchronously, so the animation never waits for the network).
   smoothly(() => {
     if (inbox) {
@@ -839,23 +922,8 @@ async function setStatus(id, to, { quiet = false, known = null } = {}) {
     else if (wasOpen) renderDetail();
   });
 
-  if (quiet) {
-    toast(`Back to ${STATUS_TEXT[to]}.`);
-  } else if (before && before !== to) {
-    undo = () => {
-      setStatus(id, before, { quiet: true, known: change });
-      go({ id: String(id) });
-    };
-    toast(`Marked ${STATUS_TEXT[to]}.`, false, ["Undo", runUndo]);
-  } else {
-    toast(`Marked ${STATUS_TEXT[to]}.`);
-  }
-
-  // Saves for one email go one after another, so an Undo can never reach n8n before the change it
-  // undoes; and no list is fetched while a save is under way (it would show the old status).
   pending += 1;
-  const run = (saving.get(id) || Promise.resolve()).catch(() => {}).then(() =>
-    api(`/api/emails/${id}/status`, { method: "POST", body: { to } }));
+  const run = (saving.get(id) || Promise.resolve()).catch(() => {}).then(() => api(path, { method: "POST", body }));
   saving.set(id, run);
   try {
     await run;
@@ -864,16 +932,57 @@ async function setStatus(id, to, { quiet = false, known = null } = {}) {
     toast(`Not saved: ${error.message}`, true);
     emails.delete(String(id));
     await render();
-    return;
+    return { now, saved: false };
   } finally {
     if (saving.get(id) === run) saving.delete(id);
   }
   pending -= 1;
+  if (state().id === String(id)) loadActivity(String(id));
   // Once every change is saved, take the server's list (late flags, waiting times) quietly.
   if (pending === 0) {
     backgroundRefresh();
     loadOtherViews();
   }
+  return { now, saved: true };
+}
+
+// Done / Waiting / Reopen, with Undo, which puts the status back and reopens the email.
+function setStatus(id, to, { quiet = false, known = null } = {}) {
+  const listed = inbox?.items.find((item) => item.id === id) || known;
+  const before = listed?.status ?? (openEmail?.id === id ? openEmail.status : undefined);
+  const result = change(id, { status: to }, `/api/emails/${id}/status`, { to }, known);
+  if (quiet) {
+    toast(`Back to ${STATUS_TEXT[to]}.`);
+  } else if (before && before !== to) {
+    const was = { ...listed, status: to, ...(to === "open" ? {} : { waiting: "", late: false }) };
+    undo = () => {
+      setStatus(id, before, { quiet: true, known: was });
+      go({ id: String(id) });
+    };
+    toast(`Marked ${STATUS_TEXT[to]}.`, false, ["Undo", runUndo]);
+  } else {
+    toast(`Marked ${STATUS_TEXT[to]}.`);
+  }
+  return result;
+}
+
+// Who has an email. Staff take one or let theirs go; an admin gives it to anyone.
+function personName(id) {
+  return inbox?.people.find((person) => person.id === id)?.name || "someone";
+}
+function assign(id, userId) {
+  const text = userId === null ? "Nobody has it now." : userId === me.id ? "It's yours." : `Given to ${personName(userId)}.`;
+  change(id, { assignee: userId }, `/api/emails/${id}/assign`, { user_id: userId }).then(({ saved }) => saved && toast(text));
+}
+function assigneeOf(email) {
+  const listed = inbox?.items.find((item) => item.id === email.id);
+  return listed ? listed.assignee : email.assignee ?? null;
+}
+
+// A person's correction of the AI's labels; the email is marked as sorted by a person.
+function relabel(id, patch) {
+  scrolledTo = ""; // a new priority can move the row: bring it back into sight
+  change(id, { ...patch, sorted_by: "person" }, `/api/emails/${id}/labels`, patch).then(({ saved }) => saved && toast("Labels saved."));
 }
 
 // --- loading ------------------------------------------------------------------
@@ -1099,6 +1208,15 @@ function act(to) {
   if (openEmail && (BUTTONS[openEmail.status] || []).some(([status]) => status === to)) setStatus(openEmail.id, to);
 }
 
+// A: take the open email, or let it go if it is yours (an admin uses the menu to give it away).
+function takeOrLetGo() {
+  if (!openEmail) return;
+  const current = assigneeOf(openEmail);
+  if (current === null) assign(openEmail.id, me.id);
+  else if (current === me.id) assign(openEmail.id, null);
+  else toast(`${personName(current)} has it.${me.is_admin ? " Use the menu to give it to someone else." : ""}`);
+}
+
 function step(by) {
   const id = neighbour(by);
   if (id) go({ id });
@@ -1109,13 +1227,14 @@ const KEYS = {
   k: () => step(-1), ArrowUp: () => step(-1),
   e: () => act("done"), w: () => act("waiting"), u: () => act("open"),
   z: runUndo,
+  a: takeOrLetGo,
   r: () => $("detail").querySelector(".reply textarea")?.focus(),
   "/": () => $("search").focus(),
   "[": () => $("collapse").click(),
   "?": () => openDialog($("shortcuts-dialog")),
   Escape: () => state().id && go({ id: "" }),
-  1: () => go({ view: "reply", id: "" }), 2: () => go({ view: "p1", id: "" }), 3: () => go({ view: "waiting", id: "" }),
-  4: () => go({ view: "done", id: "" }), 5: () => go({ view: "all", id: "" }),
+  // 1–6: the views, in the sidebar's order
+  ...Object.fromEntries(VIEWS.map(([view], i) => [String(i + 1), () => go({ view, id: "" })])),
 };
 
 document.addEventListener("keydown", (event) => {

@@ -179,6 +179,7 @@ body.app { flex-direction: row; background: var(--canvas); }
 /* avatars */
 .avatar { flex: none; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; font-size: 12px; font-weight: 600; letter-spacing: .02em; }
 .avatar.sm { width: 26px; height: 26px; font-size: 11px; }
+.avatar.xs { width: 18px; height: 18px; font-size: 8.5px; letter-spacing: 0; }
 .avatar.lg { width: 40px; height: 40px; font-size: 14px; }
 .avatar.c0 { background: var(--blue-soft); color: var(--blue); }
 .avatar.c1 { background: var(--green-soft); color: var(--green); }
@@ -234,6 +235,16 @@ body.app { flex-direction: row; background: var(--canvas); }
 .item .chips { margin-top: 6px; gap: 5px; }
 .item .chip { font-size: 11.5px; line-height: 19px; }
 .boxname { display: inline-flex; align-items: center; gap: 2px; color: var(--muted); font-size: 11.5px; }
+.holder { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 0 8px 0 2px; border-radius: 999px; background: var(--neutral-soft); color: var(--text-2); font-size: 11.5px; font-weight: 500; line-height: 22px; }
+.holder.mine { background: var(--accent-soft); color: var(--accent); }
+.holder.big { margin-left: 0; height: 32px; padding: 0 12px 0 7px; font-size: 13px; }
+/* a label a person can change: the AI's choice, with a native menu over it */
+.editable { position: relative; cursor: pointer; }
+.editable select { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; font: inherit; }
+.editable:hover { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.editable:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pick.assign { height: 32px; border-style: solid; border-color: var(--line-strong); color: var(--text-2); font-size: 13px; padding-left: 8px; }
+.pick.assign.on { border-color: transparent; }
 .boxname .dot { width: 6px; height: 6px; }
 
 /* empty, loading and failed lists say why */
@@ -320,6 +331,12 @@ body.app { flex-direction: row; background: var(--canvas); }
 .reply-foot .hint { flex: 1; color: var(--faint); font-size: 12px; }
 .reply-foot .btn kbd { background: transparent; border-color: color-mix(in srgb, var(--accent-fg) 45%, transparent); color: inherit; opacity: .85; }
 .note { display: flex; align-items: flex-start; gap: 10px; margin-top: 18px; padding: 12px 14px; border-radius: 10px; background: var(--neutral-soft); color: var(--muted); font-size: 13px; line-height: 1.5; }
+.activity { margin-top: 26px; }
+.activity h2 { margin: 0 0 10px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.activity ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.activity li { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }
+.activity li b { color: var(--text); font-weight: 600; }
+.activity time { margin-left: auto; color: var(--faint); font-size: 12px; white-space: nowrap; }
 .note .icon { margin-top: 1px; }
 .note b { color: var(--text-2); }
 .placeholder { display: flex; flex-direction: column; align-items: center; gap: 10px; margin: 28vh auto 0; color: var(--faint); text-align: center; }

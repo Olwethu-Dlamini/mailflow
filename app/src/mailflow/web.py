@@ -340,6 +340,7 @@ def create_app(
         result["stale"] = engine.stale
         # Who can hold an email (names for the avatars in the list, and for an admin's choice).
         result["people"] = [{"id": u.id, "name": u.name} for u in store.list_users() if u.active]
+        result["all_topics"] = queue.TOPICS  # what a person may set when the AI got the topic wrong
         return result
 
     def _email_json(row: dict) -> dict:
