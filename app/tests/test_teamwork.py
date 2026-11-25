@@ -93,6 +93,37 @@ def test_mine_lists_only_my_emails_that_are_not_done(team):
     assert staff.get("/api/inbox?view=mine").json()["items"] == []
 
 
+def test_a_change_of_hands_only_applies_to_the_holder_it_was_decided_on():
+    """Two people pressing Take at once: the second finds it taken, and nothing is overwritten."""
+    store = Store(":memory:")
+    a = store.add_user("a@example.com", "A", "!", is_admin=False)
+    b = store.add_user("b@example.com", "B", "!", is_admin=False)
+    assert store.set_assignee(1, a, 1.0, expected=None) is True
+    assert store.set_assignee(1, b, 2.0, expected=None) is False  # B decided on "nobody has it"
+    assert store.assignee(1) == a
+    assert store.set_assignee(1, None, 3.0, expected=b) is False
+    assert store.assignee(1) == a
+    assert store.set_assignee(1, b, 4.0, expected=a) is True  # an admin hands it over
+    assert store.set_assignee(1, None, 5.0, expected=b) is True
+    assert store.assignee(1) is None
+
+
+def test_a_take_that_lost_the_race_is_refused(team, monkeypatch):
+    client, _, store, ids = team
+    staff = client("staff")
+    real = store.assignee
+
+    def seen_free_but_thabo_takes_it(row_id):
+        store.set_assignee(row_id, ids["thabo"], 0.0, expected=None)  # Thabo, a moment later
+        return None  # what the staff member's request saw
+
+    monkeypatch.setattr(store, "assignee", seen_free_but_thabo_takes_it)
+    assert assign(staff, 1, ids["staff"]).status_code == 409
+    monkeypatch.setattr(store, "assignee", real)
+    assert assignee_in_list(staff, 1) == ids["thabo"]
+    assert staff.get("/api/emails/1/activity").json() == []
+
+
 def test_the_list_names_the_team(team):
     client, _, store, ids = team
     store.set_active(ids["thabo"], False)

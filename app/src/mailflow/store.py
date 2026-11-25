@@ -188,11 +188,19 @@ class Store:
         rows = self._run("SELECT user_id FROM assignments WHERE row_id = ?", (row_id,))
         return rows[0]["user_id"] if rows else None
 
-    def set_assignee(self, row_id: int, user_id: int | None, now: float) -> None:
-        if user_id is None:
-            self._run("DELETE FROM assignments WHERE row_id = ?", (row_id,))
-        else:
-            self._run("INSERT OR REPLACE INTO assignments VALUES (?, ?, ?)", (row_id, user_id, now))
+    def set_assignee(self, row_id: int, user_id: int | None, now: float, expected: int | None) -> bool:
+        """Give the email to `user_id` (None: nobody), only if `expected` still has it (None: nobody
+        did); False when someone changed it in between, and then nothing is written."""
+        with self._lock:
+            if expected is None and user_id is not None:
+                cursor = self._db.execute(
+                    "INSERT INTO assignments VALUES (?, ?, ?) ON CONFLICT(row_id) DO NOTHING", (row_id, user_id, now))
+            elif user_id is None:
+                cursor = self._db.execute("DELETE FROM assignments WHERE row_id = ? AND user_id = ?", (row_id, expected))
+            else:
+                cursor = self._db.execute(
+                    "UPDATE assignments SET user_id = ?, at = ? WHERE row_id = ? AND user_id = ?", (user_id, now, row_id, expected))
+            return cursor.rowcount == 1
 
     def add_activity(self, row_id: int, user_id: int, text: str, now: float) -> None:
         self._run("INSERT INTO activity (row_id, user_id, at, text) VALUES (?, ?, ?, ?)", (row_id, user_id, now, text))

@@ -412,7 +412,8 @@ def create_app(
         await _row(row_id)
         if body.user_id == current:
             return {"assignee": current}
-        store.set_assignee(row_id, body.user_id, clock())
+        if not store.set_assignee(row_id, body.user_id, clock(), expected=current):
+            raise ApiError(409, "Someone changed who has this email just now. Have another look.")
         if target is not None:
             text = "took it" if target.id == user.id else f"gave it to {target.name}"
         else:

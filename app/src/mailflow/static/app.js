@@ -427,6 +427,7 @@ const EMPTY = {
   waiting: ["Nobody to wait for", "Emails you have answered show here until the sender writes back."],
   done: ["Nothing done yet", "Emails marked Done in the last 30 days show here."],
   all: ["No email yet", "Nothing arrived in the last 30 days."],
+  mine: ["Nothing taken", "Emails you take (A) show here until they are done."],
 };
 
 function emptyState({ kind = "", iconName, title, text, action }) {
@@ -599,11 +600,15 @@ function statusButtons(email) {
 function assignControl(email) {
   const current = assigneeOf(email);
   if (me.is_admin) {
+    const people = inbox?.people || []; // empty until the list has loaded
     const select = el("select", {
       "aria-label": "Who has it", onchange: (event) => assign(email.id, event.target.value ? Number(event.target.value) : null),
     },
+      // A holder no longer on the team still shows, so "Nobody" can be picked to free the email.
+      current !== null && !people.some((person) => person.id === current)
+        ? el("option", { value: String(current), text: personName(current), selected: true, disabled: true }) : null,
       el("option", { value: "", text: "Nobody", selected: current === null }),
-      inbox.people.map((person) => el("option", { value: String(person.id), selected: person.id === current, text: person.id === me.id ? `${person.name} (you)` : person.name })));
+      people.map((person) => el("option", { value: String(person.id), selected: person.id === current, text: person.id === me.id ? `${person.name} (you)` : person.name })));
     return el("span", { class: current ? "pick on assign" : "pick assign", title: "Who has it  A" },
       current ? avatar(personName(current), "xs") : icon("userPlus"),
       el("span", { text: current ? (current === me.id ? "You" : personName(current)) : "Assign" }), icon("chevronDown"), select);
@@ -707,6 +712,8 @@ async function renderDetail() {
 // laid over the chip does the choosing).
 function labelPick(cls, text, label, options, current, onpick) {
   const select = el("select", { "aria-label": label, onchange: (event) => onpick(event.target.value) },
+    // Nothing chosen yet (an unsorted email): a placeholder, so every real choice fires a change.
+    options.some(([value]) => value === current) ? null : el("option", { value: "", text: "–", selected: true, disabled: true }),
     options.map(([value, name]) => el("option", { value, text: name, selected: value === current })));
   return el("span", { class: `${cls} editable`, title: `${label}: change it if the AI got it wrong` }, text, select);
 }
@@ -954,7 +961,8 @@ function setStatus(id, to, { quiet = false, known = null } = {}) {
   if (quiet) {
     toast(`Back to ${STATUS_TEXT[to]}.`);
   } else if (before && before !== to) {
-    const was = { ...listed, status: to, ...(to === "open" ? {} : { waiting: "", late: false }) };
+    // Undo needs the email as it was; one never in the list on screen is only reopened, not re-listed.
+    const was = listed ? { ...listed, status: to, ...(to === "open" ? {} : { waiting: "", late: false }) } : null;
     undo = () => {
       setStatus(id, before, { quiet: true, known: was });
       go({ id: String(id) });

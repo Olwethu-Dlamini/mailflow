@@ -97,6 +97,29 @@ def test_done_moves_on_and_undo_brings_the_email_back_on_the_server_too(page):
     assert count(page, "Needs reply") == "8"
 
 
+def test_undo_on_an_email_not_in_the_list_adds_no_row(page):
+    sign_in(page)
+    page.keyboard.press("6")  # Everything: loaded, and kept for later
+    page.wait_for_function("() => document.querySelector('.list-title')?.textContent === 'Everything'")
+    everything = subjects(page)
+    page.locator("#list .item", has_text=REPLY_ORDER[0]).click()
+    page.wait_for_selector(".message .body:not(.loading)")
+    # Switch to Waiting with the email still open (as Back/Forward can): it is not in that list.
+    page.evaluate("() => go({ view: 'waiting' })")
+    page.wait_for_function("() => document.querySelector('.list-title')?.textContent.startsWith('Waiting')")
+    page.keyboard.press("e")
+    wait_for_server(page, 3, "status", "done")
+    page.wait_for_selector("#toast .toast-action")
+    page.keyboard.press("z")
+    wait_for_server(page, 3, "status", "open")
+    # Show the kept Everything list as the page has it: no fresh copy from the server may replace it.
+    page.route("**/api/inbox**", lambda route: route.abort())
+    page.keyboard.press("6")
+    page.wait_for_function("() => document.querySelector('.list-title')?.textContent === 'Everything'")
+    assert page.locator("#list .item[data-id='undefined']").count() == 0
+    assert subjects(page) == everything
+
+
 def test_switching_views_with_the_number_keys(page):
     sign_in(page)
     page.keyboard.press("3")
