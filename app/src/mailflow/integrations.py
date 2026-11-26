@@ -11,6 +11,7 @@ n8n's API does not hand them back either. Before a workflow is changed it is sav
 database (store.backup_workflow), so a bad change can be undone by hand.
 """
 
+import asyncio
 import copy
 import re
 import uuid
@@ -36,6 +37,8 @@ SCOPES_HINT = (
     "n8n refused the app's API key for this. In n8n, Settings → n8n API: give the app's key the "
     "workflow and credential scopes (or use a key without scopes), then put it in the app's .env."
 )
+BUSY_WAIT = 1.0  # seconds between tries while n8n answers 409 (busy)
+BUSY_TRIES = 20
 
 
 class IntegrationError(Exception):
@@ -100,11 +103,17 @@ class N8nAdmin:
     async def aclose(self) -> None:
         await self._client.aclose()
 
-    async def _call(self, method: str, path: str, **kwargs) -> dict:
-        try:
-            response = await self._client.request(method, self._api + path, headers=self._headers, **kwargs)
-        except httpx.HTTPError as error:
-            raise IntegrationError(f"n8n could not be reached ({error.__class__.__name__}).", 502) from error
+    async def _call(self, method: str, path: str, busy_tries: int = 1, **kwargs) -> dict:
+        """One API call; a 409 (n8n still busy, e.g. unpublishing a workflow) is tried again,
+        BUSY_WAIT seconds apart, up to `busy_tries` times in all."""
+        for attempt in range(1, busy_tries + 1):
+            try:
+                response = await self._client.request(method, self._api + path, headers=self._headers, **kwargs)
+            except httpx.HTTPError as error:
+                raise IntegrationError(f"n8n could not be reached ({error.__class__.__name__}).", 502) from error
+            if response.status_code != 409 or attempt == busy_tries:
+                break
+            await asyncio.sleep(BUSY_WAIT)
         if response.status_code in (401, 403):
             raise IntegrationError(SCOPES_HINT, 502)
         if response.status_code >= 400:
@@ -146,7 +155,8 @@ class N8nAdmin:
         await self._call("POST", f"/workflows/{workflow_id}/{'activate' if active else 'deactivate'}")
 
     async def delete_workflow(self, workflow_id: str) -> None:
-        await self._call("DELETE", f"/workflows/{workflow_id}")
+        # Right after a deactivate, n8n 2.x answers 409 "still being unpublished" for a few seconds.
+        await self._call("DELETE", f"/workflows/{workflow_id}", busy_tries=BUSY_TRIES)
 
     async def credentials(self) -> list[dict]:
         """Names and types only: n8n never hands back what is inside a credential."""

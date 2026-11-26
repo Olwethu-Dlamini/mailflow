@@ -16,7 +16,7 @@ from cryptography.fernet import Fernet
 from fastapi.testclient import TestClient
 from test_web import ORIGIN, PASSWORD, SETTINGS, FakeEngine
 
-from mailflow import auth, mailer
+from mailflow import auth, integrations, mailer
 from mailflow.integrations import N8nAdmin
 from mailflow.store import Store
 from mailflow.web import create_app
@@ -45,6 +45,7 @@ def world(monkeypatch):
     monkeypatch.setattr(mailer, "SMTP", FakeSmtp)
     monkeypatch.setattr(mailer, "SMTP_SSL", FakeSmtp)
     FakeSmtp.sent = []
+    monkeypatch.setattr(integrations, "BUSY_WAIT", 0)
     store = Store(":memory:")
     store.add_user("boss@example.com", "Boss", auth.hash_password(PASSWORD), is_admin=True)
     store.add_user("staff@example.com", "Staff", auth.hash_password(PASSWORD), is_admin=False)

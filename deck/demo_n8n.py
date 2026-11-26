@@ -93,6 +93,7 @@ class FakeN8n:
         self.runs = {"coll-hello": "2026-11-26T09:41:00.000Z", "coll-sponsors": "2026-11-25T16:02:00.000Z"}
         self.calls: list[tuple[str, str]] = []
         self.refuse = set()  # (method, path start) answered 500, to test what happens when n8n fails midway
+        self.unpublishing: dict[str, int] = {}  # workflow id → DELETEs still answered 409
 
     @staticmethod
     def _answer(status: int, body) -> httpx.Response:
@@ -135,8 +136,13 @@ class FakeN8n:
             return self._answer(200, copy.deepcopy(workflow))
         if method == "POST" and rest[1:] in (["activate"], ["deactivate"]):
             workflow["active"] = rest[1] == "activate"
+            # n8n 2.47 answers 409 "still being unpublished" to a DELETE for a few seconds after this.
+            self.unpublishing[rest[0]] = 2 if rest[1] == "deactivate" else 0
             return self._answer(200, copy.deepcopy(workflow))
         if method == "DELETE":
+            if self.unpublishing.get(rest[0], 0) > 0:
+                self.unpublishing[rest[0]] -= 1
+                return self._answer(409, {"message": "Workflow is still being unpublished. Please try again in a few moments."})
             del self.workflows[rest[0]]
             return self._answer(200, workflow)
         return self._answer(405, {"message": "method not allowed"})
