@@ -174,19 +174,22 @@ First stage the settings as `~/mailflow.env` on `ai` (mode 600, values as in `.e
 `TRUSTED_PROXY=10.0.0.10`, srv1's LAN address). Then, on `ai`:
 
 ```bash
-wget -qO /tmp/ai-deploy.sh https://raw.githubusercontent.com/Olwethu-Dlamini/mailflow/main/app/deploy/ai-deploy.sh
-sudo bash /tmp/ai-deploy.sh
+wget -qO /tmp/ai-deploy.sh https://raw.githubusercontent.com/Olwethu-Dlamini/mailflow/main/app/deploy/ai-deploy.sh && sudo bash /tmp/ai-deploy.sh
 ```
 
-[`deploy/ai-deploy.sh`](deploy/ai-deploy.sh) clones (or pulls) the repo into `/opt/mailflow`,
-moves the settings to `/opt/mailflow/app/.env` (root, 600), builds and starts the container, waits
-for it to be healthy and, when there are no accounts yet, asks for your admin account.
+[`deploy/ai-deploy.sh`](deploy/ai-deploy.sh) clones (or pulls) the repo into `/opt/mailflow` and
+carries on with the version it just pulled, moves the settings to `/opt/mailflow/app/.env` (root,
+600), makes `MAILFLOW_SECRET_KEY` once, builds and starts the container, waits for it to be healthy
+and, when there are no accounts yet, asks for your admin account. It then checks what the app's
+n8n API key may do (the emails table, workflows, credentials), that the site answers through
+Cloudflare, and lists what is left to do in a browser. It also keeps `~/mailflow-deploy.sh` the
+same as itself.
 
 The port is published on ai's LAN address only (`10.0.0.31:3100`, change with `MAILFLOW_BIND`),
 so the app is reached through srv1 and Cloudflare, not around them. The container runs read-only,
 without Linux capabilities, as a non-root user, in 128 MB.
 
-Update later: run the same script again.
+Update later: the same command, or `sudo bash ~/mailflow-deploy.sh`. Nothing changes on srv1.
 
 Accounts from the server: `sudo docker compose exec mailflow mailflow user list|reset|disable|enable --email …`.
 

@@ -65,3 +65,42 @@ if [ -z "$(docker compose exec -T mailflow mailflow user list)" ]; then
   read -rp "Your email address: " email
   docker compose exec mailflow mailflow user add --email "$email" --name Olwethu --admin
 fi
+
+# Keep the copy in your home folder (sudo bash ~/mailflow-deploy.sh) the same as this one.
+install -m 755 -o "${SUDO_USER:-oll}" "$DIR/app/deploy/ai-deploy.sh" "/home/${SUDO_USER:-oll}/mailflow-deploy.sh"
+
+echo
+echo "==> What the app's n8n API key may do (Integrations needs workflows and credentials)"
+docker compose exec -T mailflow python - <<'PY' || true
+import os
+import httpx
+base = os.environ.get("N8N_URL", "http://n8n:5678").rstrip("/") + "/api/v1"
+headers = {"X-N8N-API-KEY": os.environ["N8N_API_KEY"]}
+checks = (("the emails table", f"/data-tables/{os.environ['MAILFLOW_TABLE_ID']}/rows?limit=1"),
+          ("workflows", "/workflows?limit=1"), ("credentials", "/credentials?limit=1"))
+refused = False
+for name, path in checks:
+    try:
+        code = httpx.get(base + path, headers=headers, timeout=15).status_code
+    except httpx.HTTPError as error:
+        code = error.__class__.__name__
+    refused |= code != 200
+    print(f"   {name}: {'ok' if code == 200 else f'refused ({code})'}")
+if refused:
+    print("   In n8n: Settings > n8n API > create a key with those scopes (or no scopes), put it in")
+    print("   N8N_API_KEY in /opt/mailflow/app/.env, then run this script again.")
+PY
+
+echo
+echo "==> Through Cloudflare"
+curl -fsS -o /dev/null -w "   https://mailflow.22112002.xyz answers %{http_code}\n" https://mailflow.22112002.xyz/healthz || echo "   not reachable from here: check srv1 (deploy/srv1-publish.sh)"
+
+echo
+echo "==> Left for you, in a browser"
+if grep -q '^GOOGLE_CLIENT_ID=..*' "$DIR/app/.env"; then
+  echo "   - Continue with Google is on."
+else
+  echo "   - Continue with Google is off (optional): app/README.md, 'Continue with Google'."
+fi
+echo "   - Google Cloud console: publish the OAuth consent screen, or the Gmail login in n8n expires every 7 days."
+echo "   - Sign in as an admin: account menu > Integrations, to connect mailboxes, SMTP replies, the AI and alerts."
