@@ -8,6 +8,8 @@ Run:   cd app && uv run python ../deck/demo_server.py      (then open http://127
        DEMO_N8N_MS=800 …   makes each call to the stand-in n8n take 800 ms, like the real one
 Login: demo@mailflow.example / demo-password-123
 (The Google button shows, but leads to Google's error page: the demo has no real Google client.)
+Integrations (admin menu) run against stand-ins (demo_n8n.py): any mail server with the password
+demo-password, AI key demo-key, and the Telegram token in demo_n8n.GOOD_TOKEN.
 """
 
 import asyncio
@@ -17,12 +19,15 @@ import tempfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import demo_n8n
 import httpx
 import uvicorn
+from cryptography.fernet import Fernet
 
-from mailflow import auth, web
+from mailflow import auth, mailer, web
 from mailflow.config import Settings
 from mailflow.google import GoogleLogin
+from mailflow.integrations import N8nAdmin
 from mailflow.n8n import Engine
 from mailflow.store import Store
 from mailflow.web import create_app
@@ -141,9 +146,14 @@ def build_app(port: int):
         n8n_url="http://demo", n8n_api_key="demo", table_id="demo", reply_url="http://demo/webhook/mailflow/reply",
         reply_secret="demo", db_path=str(db), cookie_secure=False, trusted_proxy="", site_origin=f"http://127.0.0.1:{port}",
         google_client_id="demo.apps.googleusercontent.com", google_client_secret="demo",
+        secret_key=Fernet.generate_key().decode(),
     )
     engine = Engine(settings, transport=httpx.MockTransport(fake_n8n))
-    return create_app(settings, engine, store, google=GoogleLogin(settings))
+    # Integrations: a stand-in n8n API, providers and mail servers (password demo-password, key demo-key).
+    mailer.IMAP, mailer.SMTP, mailer.SMTP_SSL = demo_n8n.FakeImap, demo_n8n.FakeSmtp, demo_n8n.FakeSmtp
+    n8n_admin = N8nAdmin(settings, transport=httpx.MockTransport(demo_n8n.FakeN8n()))
+    outside = httpx.AsyncClient(transport=httpx.MockTransport(demo_n8n.fake_outside))
+    return create_app(settings, engine, store, google=GoogleLogin(settings), n8n_admin=n8n_admin, outside=outside)
 
 
 def main() -> None:

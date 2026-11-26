@@ -3,6 +3,8 @@
 import os
 from dataclasses import dataclass
 
+from .vault import valid_key
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -15,6 +17,8 @@ class Settings:
     cookie_secure: bool  # False only for testing over plain http on the laptop
     trusted_proxy: str  # srv1's LAN address: only through it is Cloudflare's Cf-Connecting-IP believed
     site_origin: str  # e.g. https://mailflow.22112002.xyz; POSTs from any other origin are refused
+    # Seals the SMTP passwords the app keeps (vault.py); without it, SMTP replies cannot be set up.
+    secret_key: str = ""
     # "Continue with Google": on only when both are set (Google Cloud → Clients → Web application)
     google_client_id: str = ""
     google_client_secret: str = ""
@@ -35,6 +39,13 @@ def _google() -> tuple[str, str]:
     return client_id, secret
 
 
+def _secret_key() -> str:
+    key = os.environ.get("MAILFLOW_SECRET_KEY", "").strip()
+    if key and not valid_key(key):
+        raise SystemExit("MAILFLOW_SECRET_KEY must be 32 bytes in url-safe base64 (44 characters, see .env.example)")
+    return key
+
+
 def from_env() -> Settings:
     n8n_url = os.environ.get("N8N_URL", "http://n8n:5678").rstrip("/")
     google_client_id, google_client_secret = _google()
@@ -52,4 +63,5 @@ def from_env() -> Settings:
         site_origin=_need("SITE_ORIGIN").rstrip("/"),
         google_client_id=google_client_id,
         google_client_secret=google_client_secret,
+        secret_key=_secret_key(),
     )

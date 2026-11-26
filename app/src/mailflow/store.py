@@ -1,5 +1,6 @@
-"""Accounts, sessions and failed logins, and the team's own notes on each email (who has it, who
-did what), in the app's own SQLite file.
+"""Accounts, sessions and failed logins, the team's own notes on each email (who has it, who did
+what), and what admins connected (mailboxes, copies of n8n workflows before a change), in the app's
+own SQLite file.
 
 The email itself lives in n8n's data table; rows here refer to it by its row id.
 """
@@ -47,12 +48,29 @@ CREATE TABLE IF NOT EXISTS activity (
     text TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS activity_row ON activity(row_id, at);
+CREATE TABLE IF NOT EXISTS mailboxes (
+    label TEXT PRIMARY KEY,
+    workflow_id TEXT,      -- the collector the app made in n8n (NULL: made by hand in n8n)
+    credential_id TEXT,    -- its IMAP credential in n8n
+    smtp TEXT,             -- JSON (mailer.Smtp) when replies leave over SMTP, else NULL
+    smtp_secret BLOB,      -- that SMTP password, sealed (vault.py)
+    updated_by INTEGER REFERENCES users(id),
+    updated_at REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS n8n_backups (
+    id INTEGER PRIMARY KEY,
+    at REAL NOT NULL,
+    workflow_id TEXT NOT NULL,
+    body TEXT NOT NULL,    -- the workflow as n8n returned it, before the app changed it
+    by INTEGER REFERENCES users(id)
+);
 """
 NOTES_SECONDS = 120 * 24 * 3600  # n8n deletes emails after 90 days; notes on them go a month later
 # Added after the first release: an existing users table gets the column on start.
 GOOGLE_SUB = "ALTER TABLE users ADD COLUMN google_sub TEXT"
 GOOGLE_SUB_INDEX = "CREATE UNIQUE INDEX IF NOT EXISTS users_google_sub ON users(google_sub) WHERE google_sub IS NOT NULL"
 NO_PASSWORD = "!"  # pw_hash of a Google-only account: no password ever matches it
+BACKUPS_KEPT = 50
 
 
 @dataclass(frozen=True)
@@ -213,6 +231,50 @@ class Store:
             (row_id, limit),
         )
         return [{"at": row["at"], "name": row["name"], "text": row["text"]} for row in rows]
+
+    # what admins connected
+
+    def mailboxes(self) -> dict[str, dict]:
+        return {row["label"]: dict(row) for row in self._run("SELECT * FROM mailboxes")}
+
+    def mailbox(self, label: str) -> dict | None:
+        rows = self._run("SELECT * FROM mailboxes WHERE label = ?", (label,))
+        return dict(rows[0]) if rows else None
+
+    def save_collector(self, label: str, workflow_id: str, credential_id: str, by: int, now: float) -> None:
+        self._run(
+            "INSERT INTO mailboxes (label, workflow_id, credential_id, updated_by, updated_at) VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT(label) DO UPDATE SET workflow_id = excluded.workflow_id, credential_id = excluded.credential_id,"
+            " updated_by = excluded.updated_by, updated_at = excluded.updated_at",
+            (label, workflow_id, credential_id, by, now),
+        )
+
+    def save_smtp(self, label: str, smtp_json: str, sealed: bytes, by: int, now: float) -> None:
+        self._run(
+            "INSERT INTO mailboxes (label, smtp, smtp_secret, updated_by, updated_at) VALUES (?, ?, ?, ?, ?)"
+            " ON CONFLICT(label) DO UPDATE SET smtp = excluded.smtp, smtp_secret = excluded.smtp_secret,"
+            " updated_by = excluded.updated_by, updated_at = excluded.updated_at",
+            (label, smtp_json, sealed, by, now),
+        )
+
+    def drop_smtp(self, label: str) -> None:
+        self._run("UPDATE mailboxes SET smtp = NULL, smtp_secret = NULL WHERE label = ?", (label,))
+        self._run("DELETE FROM mailboxes WHERE label = ? AND workflow_id IS NULL", (label,))
+
+    def drop_mailbox(self, label: str) -> None:
+        self._run("DELETE FROM mailboxes WHERE label = ?", (label,))
+
+    def smtp_labels(self) -> list[str]:
+        return [row["label"] for row in self._run("SELECT label FROM mailboxes WHERE smtp IS NOT NULL ORDER BY label")]
+
+    def backup_workflow(self, workflow_id: str, body: str, by: int, now: float) -> None:
+        """Keep the workflow as it was before a change; only the last BACKUPS_KEPT are kept."""
+        self._run("INSERT INTO n8n_backups (at, workflow_id, body, by) VALUES (?, ?, ?, ?)", (now, workflow_id, body, by))
+        self._run("DELETE FROM n8n_backups WHERE id NOT IN (SELECT id FROM n8n_backups ORDER BY id DESC LIMIT ?)", (BACKUPS_KEPT,))
+
+    def backups(self, workflow_id: str) -> list[dict]:
+        rows = self._run("SELECT at, body, by FROM n8n_backups WHERE workflow_id = ? ORDER BY id DESC", (workflow_id,))
+        return [dict(row) for row in rows]
 
     # Google sign-in in progress: one row per click on "Continue with Google", used once
 

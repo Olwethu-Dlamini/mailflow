@@ -3,6 +3,7 @@
 Run: uvicorn --factory mailflow.web:main_app
 """
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -13,15 +14,19 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
+import httpx
 from fastapi import Depends, FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, StrictBool
 
-from . import auth, config, queue
+from . import auth, config, integrations_api, mailer, queue
 from .google import CALLBACK_PATH, GoogleLogin, GoogleRefused
+from .integrations import IntegrationError, N8nAdmin
+from .mailer import MailError, Smtp
 from .n8n import STATUSES, Engine, EngineDown
 from .store import NO_PASSWORD, Store, User
+from .vault import Vault, VaultLocked
 
 log = logging.getLogger(__name__)
 
@@ -117,13 +122,23 @@ def _pages() -> dict[str, str]:
 
 
 def create_app(
-    settings: config.Settings, engine: Engine, store: Store, clock=time.time, google: GoogleLogin | None = None
+    settings: config.Settings,
+    engine: Engine,
+    store: Store,
+    clock=time.time,
+    google: GoogleLogin | None = None,
+    n8n_admin: N8nAdmin | None = None,
+    outside: httpx.AsyncClient | None = None,
 ) -> FastAPI:
+    n8n_admin = n8n_admin or N8nAdmin(settings)
+    outside = outside or httpx.AsyncClient(timeout=httpx.Timeout(20.0))  # AI providers and Telegram
+    vault = Vault(settings.secret_key)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         engine.warm()  # read the list now, so the first visitor does not wait for n8n
         yield
-        for client in (engine, google):
+        for client in (engine, google, n8n_admin, outside):
             if hasattr(client, "aclose"):
                 await client.aclose()
 
@@ -195,6 +210,20 @@ def create_app(
         log.warning("engine down: %s", error)
         return JSONResponse({"error": "MailFlow engine unreachable"}, 502)
 
+    @app.exception_handler(IntegrationError)
+    async def integration_refused(request: Request, error: IntegrationError):
+        if error.status >= 500:
+            log.warning("integration: %s", error)
+        return JSONResponse({"error": str(error)}, error.status)
+
+    @app.exception_handler(MailError)
+    async def mail_refused(request: Request, error: MailError):
+        return JSONResponse({"error": str(error)}, 400)
+
+    @app.exception_handler(VaultLocked)
+    async def vault_locked(request: Request, error: VaultLocked):
+        return JSONResponse({"error": str(error)}, 400)
+
     def current_user(request: Request) -> User:
         user = auth.session_user(store, request.cookies.get(COOKIE, ""), clock())
         if user is None:
@@ -203,7 +232,7 @@ def create_app(
 
     def admin_user(user: User = Depends(current_user)) -> User:
         if not user.is_admin:
-            raise ApiError(403, "Only an admin can manage accounts.")
+            raise ApiError(403, "Only an admin can do this.")
         return user
 
     # pages
@@ -333,10 +362,14 @@ def create_app(
 
     # email
 
+    def _reply_labels() -> list[str]:
+        """Mailboxes the page can answer from: over SMTP set up by an admin, or Gmail through n8n."""
+        return sorted({*REPLY_MAILBOXES, *store.smtp_labels()})
+
     async def _inbox_json(view: str, mailbox: str, topic: str, sender: str, user: User) -> dict:
         rows = await engine.recent_rows()
         result = queue.build(rows, view, mailbox, topic, sender, datetime.now(UTC), store.assignments(), user.id)
-        result["reply_mailboxes"] = REPLY_MAILBOXES
+        result["reply_mailboxes"] = _reply_labels()
         # An older list served while a fresh one is read: the page asks again in a moment.
         result["stale"] = engine.stale
         # Who can hold an email (names for the avatars in the list, and for an admin's choice).
@@ -349,7 +382,7 @@ def create_app(
             **{k: row.get(k) for k in (*queue.ITEM_FIELDS, "body")},
             "status": queue.status_of(row),
             "needs_reply": queue.needs_reply(row),
-            "can_reply": row.get("mailbox") in REPLY_MAILBOXES,
+            "can_reply": row.get("mailbox") in _reply_labels(),
             "assignee": store.assignee(row["id"]),
         }
 
@@ -386,16 +419,35 @@ def create_app(
         if not text or len(text) > MAX_REPLY:
             raise ApiError(400, "Write a reply first (at most 20,000 characters).")
         row = await _row(row_id)
-        if row.get("mailbox") not in REPLY_MAILBOXES:
-            raise ApiError(400, f"Replies from this page work for the {', '.join(REPLY_MAILBOXES)} mailbox only.")
-        result = await engine.send_reply(row_id, row["message_id"], text)
-        if result == "not_found":
-            raise ApiError(404, "Not sent: this email could not be found in Gmail.")
-        if result == "cannot":
-            raise ApiError(400, "Not sent: n8n refused this reply.")
+        saved = store.mailbox(row.get("mailbox") or "")
+        if saved and saved.get("smtp"):
+            await _reply_over_smtp(row, saved, text)
+        elif row.get("mailbox") in REPLY_MAILBOXES:
+            result = await engine.send_reply(row_id, row["message_id"], text)
+            if result == "not_found":
+                raise ApiError(404, "Not sent: this email could not be found in Gmail.")
+            if result == "cannot":
+                raise ApiError(400, "Not sent: n8n refused this reply.")
+        else:
+            raise ApiError(400, "Replies from this mailbox are not set up: an admin can add SMTP under Integrations.")
         _note(row_id, user, "sent a reply")
         log.info("%s replied to email %d", user.email, row_id)
         return {"result": "sent"}
+
+    async def _reply_over_smtp(row: dict, saved: dict, text: str) -> None:
+        smtp = Smtp(**json.loads(saved["smtp"]))
+        message = mailer.reply_message(
+            smtp, row.get("from_name") or "", row.get("from_address") or "", row.get("subject") or "", row.get("message_id") or "", text
+        )
+        try:
+            password = vault.open(saved["smtp_secret"])
+            await asyncio.to_thread(mailer.send, smtp, password, message)
+        except (MailError, VaultLocked) as error:
+            raise ApiError(400, f"Not sent: {error}") from None
+        try:  # sent: from here on a failure must not read as "not sent", or a retry sends it twice
+            await engine.set_status(row["id"], "waiting")
+        except EngineDown as error:
+            log.warning("reply to email %d sent, but its status stayed: %s", row["id"], error)
 
     @app.get("/api/emails/{row_id}/activity")
     def activity(row_id: int, user: User = Depends(current_user)):
@@ -501,11 +553,18 @@ def create_app(
         store.set_password(user.id, auth.hash_password(body.password))
         return {"ok": True}
 
+    integrations_api.add_routes(
+        app, admin_user=admin_user, store=store, n8n=n8n_admin, outside=outside, vault=vault, clock=clock,
+        reply_mailboxes=REPLY_MAILBOXES,
+    )
+
     return app
 
 
 def main_app() -> FastAPI:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    # httpx logs every request's address at INFO, and a Telegram bot token is part of the address.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     settings = config.from_env()
     google = GoogleLogin(settings) if settings.google_client_id else None
     return create_app(settings, Engine(settings), Store(settings.db_path), google=google)
