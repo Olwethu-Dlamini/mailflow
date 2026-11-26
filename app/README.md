@@ -56,6 +56,8 @@ now belongs at once.
 **Integrations** in the account menu, three tabs. Each checks what it can before it changes
 anything in n8n, and removes what it made if n8n refuses a later step.
 
+![The Integrations dialog, Mailboxes tab](../docs/images/app/integrations.png)
+
 - **Mailboxes.** What collects into MailFlow (any n8n workflow that reads IMAP and runs Process
   email), whether it is on, and when it last collected. Pause and resume any of them; remove those
   the app made. **Connect a mailbox**: Gmail, Outlook/Microsoft 365 or another provider (the server

@@ -44,7 +44,7 @@ def world(monkeypatch):
     monkeypatch.setattr(mailer, "IMAP", FakeImap)
     monkeypatch.setattr(mailer, "SMTP", FakeSmtp)
     monkeypatch.setattr(mailer, "SMTP_SSL", FakeSmtp)
-    FakeSmtp.sent = []
+    FakeSmtp.sent, FakeSmtp.recipients = [], []
     monkeypatch.setattr(integrations, "BUSY_WAIT", 0)
     store = Store(":memory:")
     store.add_user("boss@example.com", "Boss", auth.hash_password(PASSWORD), is_admin=True)
@@ -152,6 +152,25 @@ def test_a_collector_n8n_refuses_leaves_no_credential_behind(world):
     assert ("POST", "/credentials") in n8n.calls
 
 
+def test_values_n8n_would_run_as_expressions_are_refused_before_anything_is_made(world):
+    client, n8n, *_ = world
+    boss = client()
+    for field in ("password", "user"):
+        body = {**IMAP, "password": GOOD_PASSWORD, "label": "support@", field: "={{ $env.N8N_ENCRYPTION_KEY }}"}
+        response = boss.post("/api/integrations/mailboxes", json=body, headers=H)
+        assert response.status_code == 400 and "starts with" in response.json()["error"]
+    key = boss.post("/api/integrations/ai", json={"provider": "openai", "model": "gpt-4o-mini", "api_key": "={{ 1 }}"}, headers=H)
+    assert key.status_code == 400
+    assert not [call for call in n8n.calls if call[0] != "GET"]
+
+
+def test_a_password_with_characters_mail_servers_cannot_take_is_a_message_not_a_crash(world):
+    client, *_ = world
+    response = client().post("/api/integrations/imap/check", json={**IMAP, "password": "pässword"}, headers=H)
+    assert response.status_code == 400
+    assert "plain ASCII" in response.json()["error"] and "ä" not in response.json()["error"]
+
+
 def test_pause_resume_and_remove(world):
     client, n8n, *_ = world
     boss = client()
@@ -200,6 +219,27 @@ def test_smtp_replies_answer_in_the_thread_and_keep_the_password_sealed(world):
     assert FakeSmtp.sent[-1]["From"] == "Sales <support@example.com>"
     assert boss.delete("/api/integrations/mailboxes/22112002/smtp", headers=H).json()["replies"] is None
     assert boss.get("/api/emails/2").json()["can_reply"] is False
+    assert FakeSmtp.recipients == [["ann@buyer.example"]] * 2  # only the checked address, each time
+
+
+def test_a_saved_smtp_password_only_goes_to_the_server_it_was_saved_for(world):
+    client, _, _, store = world
+    boss = client()
+    assert boss.put("/api/integrations/mailboxes/22112002/smtp", json={**SMTP, "password": GOOD_PASSWORD}, headers=H).status_code == 200
+    moved = boss.put("/api/integrations/mailboxes/22112002/smtp", json={**SMTP, "host": "smtp.attacker.example"}, headers=H)
+    assert moved.status_code == 400 and "enter the SMTP password again" in moved.json()["error"]
+    assert json.loads(store.mailbox("22112002")["smtp"])["host"] == "smtp.example.com"
+
+
+def test_smtp_replies_stay_listed_after_their_collector_is_gone_from_n8n(world):
+    client, n8n, *_ = world
+    boss = client()
+    boss.put("/api/integrations/mailboxes/22112002/smtp", json={**SMTP, "password": GOOD_PASSWORD}, headers=H)
+    del n8n.workflows["coll-221"]  # removed by hand in n8n
+    row = mailbox(boss.get("/api/integrations").json(), "22112002")
+    assert row["workflow_id"] is None and row["replies"] == "smtp"
+    assert boss.delete("/api/integrations/mailboxes/22112002/smtp", headers=H).status_code == 200
+    assert mailbox(boss.get("/api/integrations").json(), "22112002") is None
 
 
 def test_a_refused_smtp_send_says_not_sent_and_keeps_the_email_open(world):
@@ -281,6 +321,16 @@ def test_an_ai_change_n8n_refuses_removes_the_new_key(world):
     assert n8n.workflows[PROCESS_ID]["nodes"][1]["type"].endswith("lmChatOllama")
 
 
+def test_a_key_n8n_saved_before_answering_an_error_stays(world):
+    client, n8n, *_ = world
+    n8n.fail_after.add(("PUT", "/workflows"))  # saved, then the answer is lost
+    response = client().post("/api/integrations/ai", json={"provider": "groq", "model": "llama-3.3-70b-versatile", "api_key": GOOD_KEY}, headers=H)
+    assert response.status_code == 502
+    model = next(n for n in n8n.workflows[PROCESS_ID]["nodes"] if "lmChat" in n["type"])
+    assert model["type"].endswith("lmChatGroq")
+    assert model["credentials"]["groqApi"]["id"] in n8n.credentials  # the live workflow's key was not deleted
+
+
 # --- Telegram alerts --------------------------------------------------------------------------------
 
 
@@ -300,3 +350,13 @@ def test_alerts_move_to_a_new_bot_and_chat_after_a_test_message(world):
         assert node["parameters"]["chatId"] == "-1001234"
         assert n8n.credentials[node["credentials"]["telegramApi"]["id"]]["data"]["accessToken"] == GOOD_TOKEN
     assert response.json()["chat_id"] == "-1001234"
+
+
+def test_alerts_changed_in_one_workflow_only_say_so(world):
+    client, n8n, *_ = world
+    n8n.refuse.add(("PUT", f"/workflows/{ERRORS_ID}"))
+    response = client().post("/api/integrations/alerts", json={"token": GOOD_TOKEN, "chat_id": "-1001234"}, headers=H)
+    assert response.status_code == 502
+    assert response.json()["error"].startswith("MailFlow · Process email already alerts the new chat")
+    node = next(n for n in n8n.workflows[PROCESS_ID]["nodes"] if n["type"] == "n8n-nodes-base.telegram")
+    assert node["credentials"]["telegramApi"]["id"] in n8n.credentials  # the bot Process email now uses stays

@@ -21,6 +21,14 @@ else
 fi
 
 if [ -f "$STAGED" ]; then
+  # New settings without a key keep the key already in use: a new one would lock the saved SMTP passwords.
+  if [ -f "$DIR/app/.env" ] && ! grep -q '^MAILFLOW_SECRET_KEY=..*' "$STAGED"; then
+    (
+      umask 077
+      { grep -v '^MAILFLOW_SECRET_KEY=' "$STAGED" || true; grep '^MAILFLOW_SECRET_KEY=..*' "$DIR/app/.env" || true; } > "$STAGED.new"
+      mv "$STAGED.new" "$STAGED"
+    )
+  fi
   install -m 600 -o root -g root "$STAGED" "$DIR/app/.env"
   shred -u "$STAGED"
 fi

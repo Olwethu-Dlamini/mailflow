@@ -94,6 +94,7 @@ class FakeN8n:
         self.calls: list[tuple[str, str]] = []
         self.refuse = set()  # (method, path start) answered 500, to test what happens when n8n fails midway
         self.unpublishing: dict[str, int] = {}  # workflow id → DELETEs still answered 409
+        self.fail_after = set()  # (method, path start) carried out, then answered 500 (a timeout after the save)
 
     @staticmethod
     def _answer(status: int, body) -> httpx.Response:
@@ -107,7 +108,10 @@ class FakeN8n:
         body = json.loads(request.content) if request.content else None
         parts = path.strip("/").split("/")
         if parts[0] == "workflows":
-            return self._workflows(method, parts[1:], body)
+            answer = self._workflows(method, parts[1:], body)
+            if any(method == m and path.startswith(p) for m, p in self.fail_after):
+                return self._answer(500, {"message": "saved, then failed for the test"})
+            return answer
         if parts[0] == "credentials":
             return self._credentials(method, parts[1:], body)
         if parts[0] == "executions":
@@ -193,6 +197,7 @@ class FakeImap:
         return False
 
     def login(self, user, password):
+        f"{user}{password}".encode("ascii")  # imaplib sends both as ASCII, and fails before the server sees them
         if password != GOOD_PASSWORD:
             raise imaplib.IMAP4.error(b"[AUTHENTICATIONFAILED] Invalid credentials (Failure)")
 
@@ -201,9 +206,11 @@ class FakeImap:
 
 
 class FakeSmtp:
-    """smtplib.SMTP / SMTP_SSL as the app uses it; what was sent is in FakeSmtp.sent."""
+    """smtplib.SMTP / SMTP_SSL as the app uses it; what was sent, and to whom, is in FakeSmtp.sent
+    and FakeSmtp.recipients."""
 
     sent: ClassVar[list] = []
+    recipients: ClassVar[list] = []
 
     def __init__(self, host, port, timeout=None, context=None):
         if host.startswith("unreachable"):
@@ -213,11 +220,13 @@ class FakeSmtp:
         pass
 
     def login(self, user, password):
+        f"{user}{password}".encode("ascii")  # as smtplib does
         if password != GOOD_PASSWORD:
             raise smtplib.SMTPAuthenticationError(535, b"5.7.8 Username and Password not accepted")
 
-    def send_message(self, message, from_addr=None):
+    def send_message(self, message, from_addr=None, to_addrs=None):
         FakeSmtp.sent.append(message)
+        FakeSmtp.recipients.append(to_addrs)
 
     def quit(self):
         pass

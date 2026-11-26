@@ -18,7 +18,9 @@ TIMEOUT = 20
 SECURITY = ("ssl", "starttls")
 # A real Message-ID; emails without one were given "<date|subject>" by the collector, which answers nothing.
 MESSAGE_ID = re.compile(r"<[^<>\s]+@[^<>\s]+>")
-ADDRESS = re.compile(r"[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+")
+# One plain address: no list separators, quotes or comments that could name a second recipient.
+ADDRESS = re.compile(r'[^@\s<>,;:"()\[\]\\]+@[^@\s<>,;:"()\[\]\\]+\.[^@\s<>,;:"()\[\]\\]+')
+NOT_ASCII = "The sign-in or password has characters the mail server cannot take: mail servers expect plain ASCII."
 
 # The classes used to connect; tests put stand-ins here.
 IMAP = imaplib.IMAP4_SSL
@@ -68,6 +70,8 @@ def check_imap(host: str, port: int, user: str, password: str) -> None:
         raise MailError(f"The mail server refused the sign-in: {_why(error)}") from None
     except ssl.SSLError as error:
         raise MailError(f"No secure connection to {host}:{port} ({_why(error)}). IMAP needs TLS, usually port 993.") from None
+    except UnicodeError:  # imaplib sends the sign-in as ASCII; say so without echoing any of it
+        raise MailError(NOT_ASCII) from None
     except OSError as error:
         raise MailError(f"Could not reach {host}:{port} ({_why(error)}).") from None
 
@@ -106,6 +110,8 @@ def _smtp_errors(smtp: Smtp, action):
         raise MailError(f"The SMTP server refused: {_why(error)}") from None
     except ssl.SSLError as error:
         raise MailError(f"No secure connection to {smtp.host}:{smtp.port} ({_why(error)}).") from None
+    except UnicodeError:  # smtplib sends the sign-in as ASCII
+        raise MailError(NOT_ASCII) from None
     except OSError as error:
         raise MailError(f"Could not reach {smtp.host}:{smtp.port} ({_why(error)}).") from None
 
@@ -143,7 +149,8 @@ def send(smtp: Smtp, password: str, message: EmailMessage) -> None:
     def deliver():
         server = _open_smtp(smtp, password)
         try:
-            server.send_message(message, from_addr=parseaddr(message["From"])[1])
+            # Only the one checked address receives it, whatever else the To header might hold.
+            server.send_message(message, from_addr=parseaddr(message["From"])[1], to_addrs=[parseaddr(message["To"])[1]])
         finally:
             server.quit()
 

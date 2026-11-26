@@ -88,11 +88,12 @@ function renderIntegrations() {
 function mailboxRow(box) {
   const replies = box.smtp ? `SMTP · ${box.smtp.from_address}` : box.replies === "gmail" ? "Gmail, through n8n" : "Not set up";
   const actions = [
-    el("button", {
+    // A mailbox known only for its SMTP replies has no collector in n8n to pause.
+    box.workflow_id ? el("button", {
       type: "button", class: "btn small",
       onclick: () => mailboxAction(`/api/integrations/mailboxes/${encodeURIComponent(box.label)}/${box.active ? "pause" : "resume"}`, "POST",
         box.active ? `${box.label} is paused: no new emails are collected.` : `${box.label} collects again.`),
-    }, box.active ? "Pause" : "Resume"),
+    }, box.active ? "Pause" : "Resume") : null,
     el("button", { type: "button", class: "btn small", onclick: () => { smtpFor = box.label; renderIntegrations(); } }, "Replies…"),
     box.managed ? el("button", {
       type: "button", class: "btn small danger",
@@ -105,7 +106,7 @@ function mailboxRow(box) {
   ];
   return el("tr", {},
     el("td", {}, el("span", { class: "mailbox-name" }, el("span", { class: `dot ${colourOf(box.label)}`, "aria-hidden": "true" }), el("b", { text: box.label }))),
-    el("td", {}, el("span", { class: box.active ? "chip on" : "chip off", text: box.workflow_id ? (box.active ? "Collecting" : "Paused") : "Unknown" })),
+    el("td", {}, el("span", { class: box.active ? "chip on" : "chip off", text: box.workflow_id ? (box.active ? "Collecting" : "Paused") : "No collector" })),
     el("td", { class: "muted", text: box.last_run ? `Last email ${showTime(box.last_run, fullTime)}` : "No email yet" }),
     el("td", { text: replies }),
     el("td", {}, el("span", { class: "row-actions" }, actions)));
@@ -128,7 +129,8 @@ function mailboxesPanel() {
     boxes.length ? el("table", { class: "users mailboxes" },
       el("thead", {}, el("tr", {}, ["Mailbox", "State", "Collected", "Replies", ""].map((h) => el("th", { text: h })))),
       el("tbody", {}, boxes.map(mailboxRow))) : el("p", { class: "muted", text: "No mailboxes yet." }),
-    smtpFor ? smtpForm(boxes.find((box) => box.label === smtpFor)) : connectForm(),
+    // The reply settings of the mailbox picked, or (none picked, or it is gone) the connect form.
+    (smtpFor && smtpForm(boxes.find((box) => box.label === smtpFor))) || connectForm(),
   ];
 }
 
@@ -260,13 +262,23 @@ function aiPanel() {
     const p = providers[provider.value];
     model.value = provider.value === now?.provider ? now.model : p.model;
     models.replaceChildren();
-    const choice = keyChoice(p.credential_type, "credential", p.needs_key ? "Enter a new key…" : null);
-    const key = el("input", { name: "api_key", type: "password", autocomplete: "off", placeholder: "Paste the API key" });
-    const keyField = field("New key", key);
-    const toggle = () => { keyField.hidden = choice.value !== NEW_KEY; check.hidden = choice.value !== NEW_KEY; };
-    choice.addEventListener("change", toggle);
-    keyHolder.replaceChildren(el("div", { class: "grid" }, field(p.needs_key ? "Key" : "Server", choice), keyField));
-    toggle();
+    const saved = integrations.credentials[p.credential_type] || [];
+    if (!p.needs_key && !saved.length) {
+      // Nothing to choose and nothing to enter: the connection to the server is made in n8n.
+      keyHolder.replaceChildren(el("p", { class: "note warn" }, icon("warning"),
+        el("span", { text: "n8n has no connection to Ollama yet: add an Ollama credential in n8n, then come back here." })));
+      save.disabled = true;
+      check.hidden = true;
+    } else {
+      const choice = keyChoice(p.credential_type, "credential", p.needs_key ? "Enter a new key…" : null);
+      const key = el("input", { name: "api_key", type: "password", autocomplete: "off", placeholder: "Paste the API key" });
+      const keyField = field("New key", key);
+      const toggle = () => { keyField.hidden = choice.value !== NEW_KEY; check.hidden = choice.value !== NEW_KEY; };
+      choice.addEventListener("change", toggle);
+      keyHolder.replaceChildren(el("div", { class: "grid" }, field(p.needs_key ? "Key" : "Server", choice), keyField));
+      toggle();
+      save.disabled = false;
+    }
     privacy.lastChild.textContent = p.needs_key
       ? `Each email's sender, subject and first 4,000 characters go to ${p.label} to be sorted. Check that the team agrees.`
       : "Emails are sorted on your own server; nothing leaves it.";
