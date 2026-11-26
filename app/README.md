@@ -1,8 +1,9 @@
 # MailFlow web app
 
 The page staff work in, at `https://mailflow.22112002.xyz`. n8n stays the engine: it collects the
-mail, sorts it with Mistral and sends Gmail replies. This app only shows the `MailFlow emails`
-data table, changes an email's status, and asks `MailFlow · Reply` to send a reply.
+mail, sorts it with the AI and sends Gmail replies. This app shows the `MailFlow emails` data table,
+changes an email's status, sends replies (through `MailFlow · Reply` for Gmail, or itself over SMTP),
+and lets admins connect mailboxes, choose the AI and set the alerts in n8n from the page.
 
 ```
 browser ──https──▶ Cloudflare ──tunnel──▶ srv1 Caddy ──▶ ai:3100 MailFlow app ──▶ n8n (API + Reply webhook)
@@ -12,9 +13,15 @@ browser ──https──▶ Cloudflare ──tunnel──▶ srv1 Caddy ──�
 |---|---|
 | Accounts and sessions | SQLite in the `mailflow_data` volume (`/data/mailflow.db`) |
 | Emails | n8n data table, read and updated through n8n's API (key in `.env`, never sent to the browser) |
-| Replies | `POST http://n8n:5678/webhook/mailflow/reply` with header `X-MailFlow-Secret` (n8n credential `MailFlow app secret`) |
+| Replies | Gmail: `POST http://n8n:5678/webhook/mailflow/reply` with header `X-MailFlow-Secret` (n8n credential `MailFlow app secret`). A mailbox with SMTP set up: sent by the app |
+| Integrations | n8n's public API (credentials, workflows); SMTP passwords sealed in SQLite with `MAILFLOW_SECRET_KEY` |
 
 ## The page
+
+Signed out, the address shows a short public page: what MailFlow does and how an email flows
+through it (collect, sort, work the queue, reply and close), with **Sign in**. Inside the app,
+**How MailFlow works** in the account menu (and a small tip in the sidebar until it is closed)
+says the same in short, with the keys.
 
 ![The MailFlow page](../docs/images/app/queue.png)
 
@@ -43,6 +50,34 @@ not in n8n, and are pruned 120 days on.
 **Correcting the AI.** The priority, topic and needs-a-reply labels on the open email are menus:
 a change is written to the n8n table, `sorted_by` becomes `person`, and the email moves to where it
 now belongs at once.
+
+## Integrations (admins)
+
+**Integrations** in the account menu, three tabs. Each checks what it can before it changes
+anything in n8n, and removes what it made if n8n refuses a later step.
+
+- **Mailboxes.** What collects into MailFlow (any n8n workflow that reads IMAP and runs Process
+  email), whether it is on, and when it last collected. Pause and resume any of them; remove those
+  the app made. **Connect a mailbox**: Gmail, Outlook/Microsoft 365 or another provider (the server
+  is filled in), the sign-in and a password (for Gmail an app password). The app signs in to check,
+  then creates the n8n IMAP credential and a collector built like the hand-made ones, from today
+  or up to 30 days back, and switches it on.
+- **Replies over SMTP**, for any mailbox: server, port, SSL or STARTTLS, sign-in, password, and the
+  address and name replies come from. The app signs in to check, then keeps the password sealed
+  with `MAILFLOW_SECRET_KEY` (the deploy script makes one). Replies then leave from the app in the
+  same conversation (`In-Reply-To`, `References`); the email moves to Waiting. Most providers keep a
+  copy in Sent themselves (Gmail, Microsoft 365); others may not.
+- **AI that sorts.** The model behind *Sort with AI* in Process email: Mistral on the server
+  (Ollama), Groq, OpenAI, Mistral cloud or Anthropic. A new key is checked with the provider first
+  (and lists its models); a key already in n8n can be picked. Process email is saved in the app
+  (`n8n_backups`) before every change; switch back here at any time. With a cloud provider, each
+  email's sender, subject and first 4,000 characters go to that provider.
+- **Alerts.** The Telegram chat and bot for P1 emails and errors (Process email and Errors). A new
+  bot token sends a test message first.
+
+IMAP passwords, AI keys and bot tokens go straight into n8n credentials, which n8n keeps
+encrypted; the app never stores them and n8n never hands them back. The app's n8n API key needs
+the workflow and credential scopes (or no scopes) for this page.
 
 ## Speed
 
