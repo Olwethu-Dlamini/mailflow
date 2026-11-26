@@ -470,3 +470,60 @@ table.users tr.disabled .person { opacity: .55; }
   .detail-bar .back { display: inline-grid; }
   dialog .grid { grid-template-columns: 1fr; }
 }
+
+/* ===== welcome: the public landing page at / for signed-out visitors ===== */
+.welcome-page { overflow: auto; height: auto; min-height: 100vh; display: block; color: var(--text); line-height: 1.55; }
+.wl-wrap { width: min(1120px, 100%); margin: 0 auto; padding: 0 24px; }
+.wl-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; height: 64px; }
+.welcome-page a.brand { text-decoration: none; }
+.wl-header { border-bottom: 1px solid var(--line); background: var(--bg); }
+.wl-hero { padding: 72px 0 80px; color: #e9e9ff; background: radial-gradient(120% 90% at 0% 0%, #4a47c9 0%, #2c2a85 45%, #18174a 100%); }
+.wl-hero-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 56px; align-items: center; }
+.wl-hero h1 { margin: 0 0 20px; font-size: clamp(34px, 5.5vw, 54px); line-height: 1.06; letter-spacing: -.03em; font-weight: 750; color: #fff; }
+.wl-lead { margin: 0 0 28px; max-width: 540px; font-size: 18px; color: #d4d3f7; }
+.wl-cta { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; margin: 0; }
+.welcome-page .btn { text-decoration: none; }
+.wl-hero .btn.primary { background: #fff; border-color: #fff; color: #2c2a85; }
+.wl-hero .btn.primary:hover { background: #ececff; border-color: #ececff; }
+.btn.wl-big { height: 44px; padding: 0 24px; font-size: 15px; font-weight: 600; }
+.wl-note { font-size: 14px; color: #c9c8f5; }
+.wl-preview { margin: 0; max-width: none; --neutral-soft: #f0f0f3; --muted: #545465; }
+.wl-section { padding: 72px 0; background: var(--bg); }
+.wl-alt { background: var(--canvas); border-top: 1px solid var(--line); }
+.wl-section h2 { margin: 0 0 32px; font-size: 28px; letter-spacing: -.02em; font-weight: 700; }
+.wl-section h3 { margin: 0 0 6px; font-size: 16px; font-weight: 650; }
+.wl-section p { margin: 0; color: var(--muted); font-size: 15px; }
+.wl-steps, .wl-grid { list-style: none; margin: 0; padding: 0; display: grid; gap: 20px; }
+.wl-steps { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.wl-steps li { padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); box-shadow: var(--shadow-sm); }
+.wl-num { display: inline-grid; place-items: center; width: 30px; height: 30px; margin-bottom: 14px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: 14px; }
+.wl-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.wl-grid li { padding: 22px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.wl-grid svg { width: 22px; height: 22px; margin-bottom: 12px; color: var(--accent); }
+.wl-admins { margin-top: 32px !important; padding: 16px 20px; border-radius: 12px; border: 1px dashed var(--line-strong); }
+.wl-admins b { color: var(--text); }
+.wl-footer { border-top: 1px solid var(--line); background: var(--bg); font-size: 14px; }
+.wl-footer a { color: var(--accent); }
+@media (max-width: 960px) {
+  .wl-hero-grid { grid-template-columns: 1fr; gap: 40px; }
+  .wl-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .wl-wrap { padding: 0 16px; }
+  .wl-hero { padding: 48px 0 56px; }
+  .wl-lead { font-size: 16px; }
+  .wl-section { padding: 48px 0; }
+  .wl-steps, .wl-grid { grid-template-columns: 1fr; }
+}
+
+/* ===== guide: the in-app "How MailFlow works" dialog and the sidebar tip ===== */
+.guide-tip { position: relative; margin: 0 0 6px; padding: 10px 30px 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--accent-soft); font-size: 12.5px; line-height: 1.4; }
+.guide-tip-open { padding: 0; border: 0; background: none; color: var(--accent); font-weight: 600; text-align: left; cursor: pointer; }
+.guide-tip-open:hover { text-decoration: underline; }
+.guide-tip-close { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 5px; background: none; color: var(--muted); font-size: 15px; line-height: 1; cursor: pointer; }
+.guide-tip-close:hover { background: var(--hover); color: var(--text); }
+.side-collapsed .guide-tip { display: none; }
+.guide-steps { margin: 0 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; line-height: 1.5; font-size: 14px; }
+.guide-steps b { font-weight: 600; }
+.guide-tipline { margin: 14px 0 4px; padding: 10px 12px; border-radius: var(--radius); background: var(--accent-soft); font-size: 13.5px; line-height: 1.5; }

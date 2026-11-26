@@ -175,3 +175,31 @@ def test_email_text_with_html_is_shown_as_text(html_email, page):
     assert body.text_content() == html_email["body"]
     assert body.locator("img, b, script").count() == 0
     assert page.evaluate("() => window.pwned") is None
+
+
+def test_signed_out_visitors_see_how_it_works_and_can_sign_in(page):
+    page.goto("/")
+    assert page.locator("h1").text_content() == "Every mailbox.One calm queue."
+    steps = page.locator(".wl-steps h3").all_text_contents()
+    assert steps == ["Collect", "Sort", "Work the queue", "Reply and close"]
+    page.locator(".wl-hero a.btn.primary").click()
+    page.wait_for_url("**/login")
+    assert page.locator("h1").text_content() == "Sign in"
+
+
+def test_the_guide_opens_from_the_sidebar_tip_and_the_tip_stays_dismissed(page):
+    sign_in(page)
+    tip = page.locator("#guide-tip")
+    assert tip.is_visible()
+    page.click("#guide-tip-open")
+    dialog = page.locator("#guide-dialog")
+    assert dialog.is_visible()
+    assert "Work the queue" in dialog.text_content()
+    dialog.locator("[data-close]").click()
+    assert not dialog.is_visible()
+    page.click("#guide-tip-close")
+    assert not tip.is_visible()
+    page.reload()
+    page.wait_for_selector(".item")
+    assert page.locator("#user-btn").is_visible()  # the sidebar is there; only the tip is gone
+    assert not tip.is_visible()

@@ -23,12 +23,17 @@
   </label>
   <nav id="nav"></nav>
   <div class="side-foot">
+    <div id="guide-tip" class="guide-tip" hidden>
+      New here? <button id="guide-tip-open" type="button" class="guide-tip-open">How MailFlow works</button>
+      <button id="guide-tip-close" type="button" class="guide-tip-close" aria-label="Hide this tip" title="Hide this tip">×</button>
+    </div>
     <button id="sync" class="sync" type="button" title="Refresh now"></button>
     <button id="user-btn" class="user-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu"></button>
     <div id="user-menu" class="menu" role="menu" hidden>
       <button id="open-users" type="button" role="menuitem" data-icon="users" hidden>Manage users</button>
       <button id="open-password" type="button" role="menuitem" data-icon="key">Change password</button>
       <button id="open-shortcuts" type="button" role="menuitem" data-icon="keyboard">Keyboard shortcuts <kbd>?</kbd></button>
+      <button id="open-guide" type="button" role="menuitem" data-icon="info">How MailFlow works</button>
       <hr>
       <button id="logout" type="button" role="menuitem" data-icon="logout">Sign out</button>
     </div>
@@ -66,6 +71,18 @@
       <p><span><kbd>Ctrl</kbd> <kbd>↵</kbd></span> Send the reply</p>
     </section>
   </div>
+  <div class="row-buttons"><button type="button" class="btn" data-close>Close</button></div>
+</dialog>
+
+<dialog id="guide-dialog" class="narrow">
+  <h2>How MailFlow works</h2>
+  <ol class="guide-steps">
+    <li><b>Collect.</b> About every minute, each connected mailbox is checked and new emails land here.</li>
+    <li><b>Sort.</b> An AI sets the topic, sender, priority P1–P3, whether it needs a reply, a summary and the next step.</li>
+    <li><b>Work the queue.</b> Switch views with <kbd>1</kbd>–<kbd>6</kbd>, move with <kbd>J</kbd> <kbd>K</kbd>, and take an email with <kbd>A</kbd> so nobody else answers it.</li>
+    <li><b>Reply and close.</b> Reply in the same conversation, then <kbd>W</kbd> for waiting on the customer or <kbd>E</kbd> for done. <kbd>Z</kbd> undoes.</li>
+  </ol>
+  <p class="guide-tipline"><b>Tip:</b> if the AI got the topic, priority or needs-reply wrong, change it on the email; it moves at once. Late emails turn red. Press <kbd>?</kbd> for every key.</p>
   <div class="row-buttons"><button type="button" class="btn" data-close>Close</button></div>
 </dialog>
 

@@ -101,13 +101,19 @@ def test_inbox_needs_a_login(world):
     assert client.get("/api/emails/1").status_code == 401
 
 
-def test_page_redirects_to_login_without_a_session(world):
+def test_root_shows_the_welcome_page_signed_out_and_the_queue_signed_in(world):
     client, _, _ = world
     response = client.get("/", follow_redirects=False)
-    assert response.status_code == 303
-    assert response.headers["location"] == "/login"
+    assert response.status_code == 200
+    page = response.text
+    assert "One calm queue." in page and "How it works" in page
+    assert 'href="/login"' in page
+    assert 'id="boot"' not in page
+    assert "Charged twice" not in page and "Quote" not in page
     login(client)
-    assert client.get("/", follow_redirects=False).status_code == 200
+    queue = client.get("/", follow_redirects=False)
+    assert queue.status_code == 200
+    assert 'id="boot"' in queue.text
 
 
 def test_login_sets_an_httponly_strict_cookie_and_inbox_works(world):

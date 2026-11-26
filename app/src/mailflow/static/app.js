@@ -1083,6 +1083,13 @@ function formError(form, message) {
 
 $("open-password").addEventListener("click", () => openDialog($("password-dialog")));
 $("open-shortcuts").addEventListener("click", () => openDialog($("shortcuts-dialog")));
+$("open-guide").addEventListener("click", () => openDialog($("guide-dialog")));
+$("guide-tip").hidden = localStorage.getItem("mf-guide-dismissed") === "1";
+$("guide-tip-open").addEventListener("click", () => openDialog($("guide-dialog")));
+$("guide-tip-close").addEventListener("click", () => {
+  localStorage.setItem("mf-guide-dismissed", "1");
+  $("guide-tip").hidden = true;
+});
 $("password-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.target;

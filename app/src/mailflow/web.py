@@ -103,7 +103,7 @@ def _user_json(user: User) -> dict:
 
 
 def _pages() -> dict[str, str]:
-    """The two HTML pages with every /static/ link stamped with a hash of the static files.
+    """The HTML pages with every /static/ link stamped with a hash of the static files.
 
     A stamped file never changes under its address, so browsers (and Cloudflare) keep it for a year
     and a repeat visit loads no CSS or JS at all; a deploy changes the hash, so nobody runs old code.
@@ -112,7 +112,7 @@ def _pages() -> dict[str, str]:
     version = hashlib.sha256(b"".join(p.name.encode() + p.read_bytes() for p in files)).hexdigest()[:12]
     return {
         name: re.sub(r'((?:href|src)="/static/[^"?]+)"', rf'\1?v={version}"', (STATIC / name).read_text())
-        for name in ("index.html", "login.html")
+        for name in ("index.html", "login.html", "welcome.html")
     }
 
 
@@ -176,6 +176,7 @@ def create_app(
         if settings.cookie_secure:
             response.headers["Strict-Transport-Security"] = "max-age=31536000"
         # The queue page carries the account, the list and an email's text: never stored, like the API.
+        # (Signed out, / is the public welcome page; it varies with the cookie, so it is not stored either.)
         if request.url.path.startswith(("/api/", "/auth/")) or request.url.path == "/":
             response.headers["Cache-Control"] = "no-store"
         elif request.url.path.startswith("/static/") and "v" in request.query_params:
@@ -218,8 +219,8 @@ def create_app(
     @app.get("/")
     async def index(request: Request):
         user = auth.session_user(store, request.cookies.get(COOKIE, ""), clock())
-        if user is None:
-            return RedirectResponse("/login", 303)
+        if user is None:  # the public page that says what MailFlow is and how it works
+            return HTMLResponse(pages["welcome.html"])
         # The account, the list and the open email ride along with the page, so it shows them
         # without three more round trips. Only what is in memory: the page never waits for n8n.
         q = request.query_params

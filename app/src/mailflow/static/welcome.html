@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>MailFlow · Every mailbox, one calm queue</title>
+<meta name="description" content="MailFlow collects every team mailbox into one queue, sorts each email with AI, and lets the team take, answer and close emails without answering twice.">
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="welcome-page">
+<header class="wl-header">
+  <div class="wl-wrap wl-bar">
+    <a class="brand" href="/"><span class="mark" aria-hidden="true">M</span>MailFlow</a>
+    <a class="btn" href="/login">Sign in</a>
+  </div>
+</header>
+
+<main>
+  <section class="wl-hero" aria-labelledby="wl-title">
+    <div class="wl-wrap wl-hero-grid">
+      <div class="wl-hero-text">
+        <h1 id="wl-title">Every mailbox.<br>One calm queue.</h1>
+        <p class="wl-lead">MailFlow gathers the team's mailboxes into one list, has an AI sort every email, and lets each person take, answer and close their share without two people answering the same email.</p>
+        <p class="wl-cta"><a class="btn primary wl-big" href="/login">Sign in</a><span class="wl-note">An admin adds accounts.</span></p>
+      </div>
+      <div class="pitch-preview wl-preview" role="img" aria-label="A picture of the queue: four emails, each with its sender, a one-line subject and a priority">
+        <div class="pv-row"><span class="avatar c2" aria-hidden="true">NM</span><span class="pv-main"><b>Nomsa Mokoena</b><span>Our video upload keeps failing</span></span><span class="prio P1">P1</span></div>
+        <div class="pv-row"><span class="avatar c1" aria-hidden="true">PR</span><span class="pv-main"><b>Pieter Riley</b><span>Sponsorship: contract and invoice</span></span><span class="prio P1">P1</span></div>
+        <div class="pv-row"><span class="avatar c4" aria-hidden="true">KD</span><span class="pv-main"><b>Kofi Dlamini</b><span>Can I still register?</span></span><span class="prio P2">P2</span></div>
+        <div class="pv-row"><span class="avatar c3" aria-hidden="true">SA</span><span class="pv-main"><b>Sara Adams</b><span>Looking for a team</span></span><span class="prio P3">P3</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="wl-section" aria-labelledby="wl-how">
+    <div class="wl-wrap">
+      <h2 id="wl-how">How it works</h2>
+      <ol class="wl-steps">
+        <li>
+          <span class="wl-num" aria-hidden="true">1</span>
+          <h3>Collect</h3>
+          <p>About every minute, MailFlow checks each connected mailbox (Gmail, your own domain, any IMAP host) and saves each new email.</p>
+        </li>
+        <li>
+          <span class="wl-num" aria-hidden="true">2</span>
+          <h3>Sort</h3>
+          <p>An AI reads each email and sets the topic, who sent it, priority P1 to P3, whether it needs a reply, a one-line summary and the next step. Newsletters and no-reply mail are sorted by simple rules.</p>
+        </li>
+        <li>
+          <span class="wl-num" aria-hidden="true">3</span>
+          <h3>Work the queue</h3>
+          <p>Everyone works one list: Needs reply, Mine, P1, Waiting on customer, Done and Everything. Search, or filter by mailbox, topic or sender. Take an email so nobody else answers it.</p>
+        </li>
+        <li>
+          <span class="wl-num" aria-hidden="true">4</span>
+          <h3>Reply and close</h3>
+          <p>Reply from the page in the same conversation, then mark it Waiting on customer or Done. Made a mistake? Undo.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="wl-section wl-alt" aria-labelledby="wl-features">
+    <div class="wl-wrap">
+      <h2 id="wl-features">Built for a small team</h2>
+      <ul class="wl-grid">
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          <h3>Never answer twice</h3>
+          <p>Take an email and it is yours, listed under Mine. Admins can hand one to someone. Each email keeps a log of who took it, replied, closed or corrected it.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+          <h3>Correct the AI</h3>
+          <p>Wrong topic, priority or needs-reply? Anyone can fix it, and the email moves to the right place at once.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+          <h3>Nothing slips</h3>
+          <p>A P1 waiting over 4 hours, or a P2 over a day, turns red. A new P1 also sends a Telegram alert.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M8 15h8"/></svg>
+          <h3>Keyboard first</h3>
+          <p>Keys 1 to 6 switch views, J and K move, A takes, E marks done, W waiting, Z undoes. Press ? to see them all.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg>
+          <h3>On your phone</h3>
+          <p>The same queue works on a phone, with the sidebar as a drawer. Light or dark, as your device prefers.</p>
+        </li>
+        <li>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          <h3>Your own servers</h3>
+          <p>MailFlow and its AI (Mistral by default) run on the team's own server. Emails are kept 90 days, then cleaned up.</p>
+        </li>
+      </ul>
+      <p class="wl-admins"><b>For admins:</b> add accounts (email and password, or Continue with Google), connect mailboxes on the Integrations page, set up SMTP so any mailbox can send replies, and choose the AI provider and alerts.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="wl-footer">
+  <div class="wl-wrap wl-bar">
+    <span class="brand"><span class="mark" aria-hidden="true">M</span>MailFlow</span>
+    <a href="/login">Sign in</a>
+  </div>
+</footer>
+</body>
+</html>
