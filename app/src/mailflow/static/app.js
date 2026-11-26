@@ -62,6 +62,7 @@ const ICONS = {
   user: ["M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2", "M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"],
   userPlus: ["M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", "M9 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z", "M19 8v6", "M22 11h-6"],
   pencil: ["M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"],
+  plug: ["M12 22v-5", "M9 8V2", "M15 8V2", "M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"],
 };
 const SVG = "http://www.w3.org/2000/svg";
 
@@ -306,6 +307,7 @@ function renderUser() {
     el("span", { class: "who" }, el("b", { text: me.name }), el("span", { text: me.email })),
     icon("chevronUp", "icon chev"));
   $("open-users").hidden = !me.is_admin;
+  $("open-integrations").hidden = !me.is_admin;
   // A Google-only account has no password to change.
   $("open-password").hidden = Boolean(me.google_only);
   for (const item of document.querySelectorAll("[data-icon]")) item.prepend(icon(item.dataset.icon));
@@ -794,8 +796,8 @@ function emailView(email, { loading = false, draft = "", enter = false } = {}) {
 function replyBox(email, draft) {
   if (!email.can_reply) {
     return el("p", { class: "note" }, icon("info"),
-      el("span", {}, "Replies from MailFlow go out through Gmail only. Answer from the ", el("b", { text: email.mailbox || "" }),
-        " mailbox in your mail app, then mark it Waiting or Done here."));
+      el("span", {}, "Replies from this page are not set up for the ", el("b", { text: email.mailbox || "" }),
+        " mailbox: answer from your mail app, then mark it Waiting or Done here. An admin can set up SMTP under Integrations."));
   }
   if (email.status === "done") return null;
   const text = el("textarea", { rows: "6", required: true, placeholder: `Write to ${email.from_name || email.from_address}…`, "aria-label": "Reply" });
@@ -833,7 +835,7 @@ function replyBox(email, draft) {
     el("div", { class: "reply-to" }, icon("reply"), el("span", {}, "Reply from ", el("b", { text: email.mailbox }), " to ", el("b", { text: email.from_address || "" }))),
     text,
     el("div", { class: "reply-foot" },
-      el("span", { class: "hint", text: "Sent in the same Gmail conversation; the email then moves to Waiting." }),
+      el("span", { class: "hint", text: "Sent in the same conversation; the email then moves to Waiting." }),
       send));
   return form;
 }

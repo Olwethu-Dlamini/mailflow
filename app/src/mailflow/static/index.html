@@ -9,6 +9,7 @@
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/app.css">
 <script src="/static/app.js" defer></script>
+<script src="/static/integrations.js" defer></script>
 </head>
 <body class="app">
 <aside class="sidebar" id="sidebar" aria-label="Views and mailboxes">
@@ -31,6 +32,7 @@
     <button id="user-btn" class="user-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu"></button>
     <div id="user-menu" class="menu" role="menu" hidden>
       <button id="open-users" type="button" role="menuitem" data-icon="users" hidden>Manage users</button>
+      <button id="open-integrations" type="button" role="menuitem" data-icon="plug" hidden>Integrations</button>
       <button id="open-password" type="button" role="menuitem" data-icon="key">Change password</button>
       <button id="open-shortcuts" type="button" role="menuitem" data-icon="keyboard">Keyboard shortcuts <kbd>?</kbd></button>
       <button id="open-guide" type="button" role="menuitem" data-icon="info">How MailFlow works</button>
@@ -124,6 +126,16 @@
         <button type="submit" class="btn primary">Add user</button>
       </div>
     </form>
+  </div>
+</dialog>
+
+<dialog id="integrations-dialog" class="wide">
+  <div class="dialog-body">
+    <div class="dialog-head">
+      <h2>Integrations</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close" data-icon="x"></button>
+    </div>
+    <div id="integrations-body"></div>
   </div>
 </dialog>
 

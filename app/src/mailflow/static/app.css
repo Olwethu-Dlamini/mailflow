@@ -527,3 +527,23 @@ table.users tr.disabled .person { opacity: .55; }
 .guide-steps { margin: 0 0 8px; padding-left: 20px; display: flex; flex-direction: column; gap: 10px; line-height: 1.5; font-size: 14px; }
 .guide-steps b { font-weight: 600; }
 .guide-tipline { margin: 14px 0 4px; padding: 10px 12px; border-radius: var(--radius); background: var(--accent-soft); font-size: 13.5px; line-height: 1.5; }
+
+/* ===== integrations: the admins' dialog for mailboxes, SMTP replies, the AI and alerts ===== */
+dialog.wide { max-width: min(980px, 96vw); }
+dialog select { font: inherit; width: 100%; height: 40px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: var(--radius); background: var(--bg); color: var(--text); }
+dialog select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+dialog label .hint { font-size: 12px; font-weight: 400; color: var(--faint); }
+dialog label[hidden] { display: none; }
+.tabs { display: flex; gap: 4px; margin: 8px 0 16px; border-bottom: 1px solid var(--line); }
+.tab { height: 36px; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none; color: var(--muted); font: inherit; font-weight: 500; cursor: pointer; }
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-panel > p { margin: 0 0 10px; }
+.note.warn { margin: 0 0 12px; background: var(--amber-soft); color: var(--amber); }
+.chip.on { background: var(--green-soft); color: var(--green); }
+.mailbox-name { display: inline-flex; align-items: center; gap: 4px; }
+table.mailboxes td { font-size: 13px; }
+.add-user.integration .grid { align-items: start; }
+@media (max-width: 760px) {
+  table.mailboxes th:nth-child(3), table.mailboxes td:nth-child(3) { display: none; }
+}
