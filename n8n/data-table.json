@@ -1,0 +1,73 @@
+{
+  "name": "MailFlow emails",
+  "columns": [
+    {
+      "name": "message_id",
+      "type": "string"
+    },
+    {
+      "name": "mailbox",
+      "type": "string"
+    },
+    {
+      "name": "source",
+      "type": "string"
+    },
+    {
+      "name": "from_name",
+      "type": "string"
+    },
+    {
+      "name": "from_address",
+      "type": "string"
+    },
+    {
+      "name": "subject",
+      "type": "string"
+    },
+    {
+      "name": "received_at",
+      "type": "date"
+    },
+    {
+      "name": "body",
+      "type": "string"
+    },
+    {
+      "name": "summary",
+      "type": "string"
+    },
+    {
+      "name": "sorted_by",
+      "type": "string"
+    },
+    {
+      "name": "status",
+      "type": "string"
+    },
+    {
+      "name": "type",
+      "type": "string"
+    },
+    {
+      "name": "priority",
+      "type": "string"
+    },
+    {
+      "name": "mood",
+      "type": "string"
+    },
+    {
+      "name": "needs_reply",
+      "type": "boolean"
+    },
+    {
+      "name": "next_step",
+      "type": "string"
+    },
+    {
+      "name": "sender",
+      "type": "string"
+    }
+  ]
+}

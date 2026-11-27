@@ -1,0 +1,392 @@
+{
+  "name": "MailFlow · Reply",
+  "nodes": [
+    {
+      "id": "86e0b734-9941-4985-8ce0-0b0c89027492",
+      "name": "Reply webhook",
+      "webhookId": "3323d27b-ca80-4bf4-bae8-7cb40af9d300",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mailflow/reply",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "name": "MailFlow app secret"
+        }
+      }
+    },
+    {
+      "id": "b93a0846-651c-4e03-966b-1ea622bf3c55",
+      "name": "Get email",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "alwaysOutputData": true,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "dataTableId": {
+          "__rl": true,
+          "value": "MAILFLOW_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "MailFlow emails"
+        },
+        "operation": "get",
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "message_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.body.id }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      }
+    },
+    {
+      "id": "e8e0fbe6-bb77-4723-958f-bc1bf6f89684",
+      "name": "Can reply?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "09c63e8d-a077-46ca-bfdc-ce61fd4ab586",
+              "leftValue": "={{ $json.mailbox }}",
+              "rightValue": "gmail",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "5c7d66d9-0cdd-42ba-9017-5b8207084b56",
+              "leftValue": "={{ ($('Reply webhook').first().json.body.text || '').trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "6c31bb21-fcbe-4788-91e3-55628db8b6cb",
+              "leftValue": "={{ String($json.message_id || '') }}",
+              "rightValue": "^<[^<>\\s]+@[^<>\\s]+>$",
+              "operator": {
+                "type": "string",
+                "operation": "regex"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "3c1fba10-d9bf-40d7-891b-254af144d299",
+      "name": "Find in Gmail",
+      "webhookId": "8187b3bf-3c69-4422-a513-396a85139b9d",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "alwaysOutputData": true,
+      "position": [
+        660,
+        -80
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 1,
+        "simple": true,
+        "filters": {
+          "q": "={{ 'rfc822msgid:' + String($json.message_id).replace(/^<|>$/g, '') + ($json.from_address ? ' from:' + String($json.from_address).replace(/[\\s\"()<>]/g, '') : '') }}"
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "MailFlow Gmail"
+        }
+      }
+    },
+    {
+      "id": "efb6c8c0-7569-4d08-883f-0fb46e659a05",
+      "name": "Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        -80
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "2a401178-dc44-4015-9859-019299fc572e",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b6b0ee21-fcbd-4fb9-a616-e118457a37a4",
+      "name": "Send reply",
+      "webhookId": "1d1cf804-7490-486f-8f5c-eaffddc75e28",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1100,
+        -160
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "reply",
+        "messageId": "={{ $json.id }}",
+        "emailType": "text",
+        "message": "={{ $('Reply webhook').first().json.body.text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "gmailOAuth2": {
+          "name": "MailFlow Gmail"
+        }
+      }
+    },
+    {
+      "id": "a7e58f2e-cc65-455d-94e1-0ed75e3aaa8c",
+      "name": "Set waiting",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "alwaysOutputData": true,
+      "position": [
+        1320,
+        -160
+      ],
+      "parameters": {
+        "resource": "row",
+        "dataTableId": {
+          "__rl": true,
+          "value": "MAILFLOW_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "MailFlow emails"
+        },
+        "operation": "update",
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "message_id",
+              "condition": "eq",
+              "keyValue": "={{ $('Reply webhook').first().json.body.id }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "waiting"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "72247653-3395-45c6-b329-c0e181d7b9ca",
+      "name": "Respond sent",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1540,
+        -160
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"result\":\"sent\"}",
+        "options": {}
+      }
+    },
+    {
+      "id": "04fcf39f-8455-480c-9c93-c3d00fb1a5be",
+      "name": "Respond cannot",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        140
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"result\":\"cannot\"}",
+        "options": {}
+      }
+    },
+    {
+      "id": "56a48555-49c4-4e32-bce9-ff731daeaff0",
+      "name": "Respond not found",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1100,
+        40
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{\"result\":\"not_found\"}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Reply webhook": {
+      "main": [
+        [
+          {
+            "node": "Get email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get email": {
+      "main": [
+        [
+          {
+            "node": "Can reply?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Can reply?": {
+      "main": [
+        [
+          {
+            "node": "Find in Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond cannot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find in Gmail": {
+      "main": [
+        [
+          {
+            "node": "Found?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Found?": {
+      "main": [
+        [
+          {
+            "node": "Send reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond not found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send reply": {
+      "main": [
+        [
+          {
+            "node": "Set waiting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set waiting": {
+      "main": [
+        [
+          {
+            "node": "Respond sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "ERRORS_WORKFLOW_ID"
+  }
+}

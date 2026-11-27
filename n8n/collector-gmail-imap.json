@@ -1,0 +1,138 @@
+{
+  "name": "MailFlow · From Gmail (IMAP)",
+  "nodes": [
+    {
+      "id": "8a8dce7b-9482-4cd2-bd41-8c03f6401aa1",
+      "name": "New Gmail email",
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "mailbox": "INBOX",
+        "postProcessAction": "nothing",
+        "downloadAttachments": false,
+        "format": "resolved",
+        "options": {
+          "customEmailConfig": "[\"ALL\", [\"SINCE\", \"16-Nov-2026\"]]",
+          "trackLastMessageId": true
+        }
+      },
+      "credentials": {
+        "imap": {
+          "name": "MailFlow · Gmail IMAP"
+        }
+      }
+    },
+    {
+      "id": "15bc675d-b9cc-4a0f-8bad-2aefa9469a2c",
+      "name": "MailFlow shape",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ea6b51c5-33fa-417e-ad23-c789bc64db93",
+              "name": "message_id",
+              "value": "={{ String($json.messageId || ('<' + $json.date + '|' + $json.subject + '>')).slice(0, 998) }}",
+              "type": "string"
+            },
+            {
+              "id": "492d2819-c750-4e88-a01f-88528aee296c",
+              "name": "mailbox",
+              "value": "gmail",
+              "type": "string"
+            },
+            {
+              "id": "50da96bb-fb3d-4157-924f-dbac7b154cba",
+              "name": "source",
+              "value": "imap",
+              "type": "string"
+            },
+            {
+              "id": "f9aac9e4-ad4b-47ea-8968-6bffd8e3ee09",
+              "name": "from_name",
+              "value": "={{ String(($json.from && $json.from.value && $json.from.value[0] && $json.from.value[0].name) || '').slice(0, 200) }}",
+              "type": "string"
+            },
+            {
+              "id": "0e2e018b-9bc9-4051-b674-ef9dec658edb",
+              "name": "from_address",
+              "value": "={{ String(($json.from && $json.from.value && $json.from.value[0] && $json.from.value[0].address) || '').slice(0, 320) }}",
+              "type": "string"
+            },
+            {
+              "id": "cb6f6270-b87d-4bfa-9894-ac0a4e0d8a90",
+              "name": "subject",
+              "value": "={{ String($json.subject || '(no subject)').slice(0, 500) }}",
+              "type": "string"
+            },
+            {
+              "id": "d368dfc8-9e92-4cc7-9735-8d6b090afa5c",
+              "name": "received_at",
+              "value": "={{ $json.date && new Date($json.date) <= new Date() ? new Date($json.date).toISOString() : $now.toISO() }}",
+              "type": "string"
+            },
+            {
+              "id": "4b552172-fb78-4ae9-9f77-bd6298a41fcb",
+              "name": "body",
+              "value": "={{ ($json.text || String($json.html || '').replace(/<style[\\s\\S]*?<\\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ') || '').slice(0, 4000) }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8e4b145c-15e8-4245-b031-5c39f4765271",
+      "name": "Process email",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": "PROCESS_EMAIL_WORKFLOW_ID",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "New Gmail email": {
+      "main": [
+        [
+          {
+            "node": "MailFlow shape",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MailFlow shape": {
+      "main": [
+        [
+          {
+            "node": "Process email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "ERRORS_WORKFLOW_ID"
+  }
+}

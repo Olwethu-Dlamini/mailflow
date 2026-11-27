@@ -1,0 +1,709 @@
+{
+  "name": "MailFlow · Process email",
+  "nodes": [
+    {
+      "id": "ac1838bc-3d2e-4c9b-83a2-1be0cbd8ec15",
+      "name": "When Executed by Another Workflow",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "message_id"
+            },
+            {
+              "name": "mailbox"
+            },
+            {
+              "name": "source"
+            },
+            {
+              "name": "from_name"
+            },
+            {
+              "name": "from_address"
+            },
+            {
+              "name": "subject"
+            },
+            {
+              "name": "received_at"
+            },
+            {
+              "name": "body"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "80925486-63a3-4bca-8048-d5dec927f1f8",
+      "name": "Already saved?",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "rowNotExists",
+        "dataTableId": {
+          "__rl": true,
+          "value": "MAILFLOW_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "MailFlow emails"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "message_id",
+              "condition": "eq",
+              "keyValue": "={{ $json.message_id }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "d96d6579-d07e-49e8-b2da-193aab119972",
+      "name": "Obvious mail?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "de6067b5-eac2-418e-9f7e-68039d186941",
+              "leftValue": "={{ ($json.body || '').toLowerCase() }}",
+              "rightValue": "unsubscribe",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "f0c61d27-8805-49d2-9344-931c88a4e436",
+              "leftValue": "={{ ($json.from_address || '').toLowerCase() }}",
+              "rightValue": "noreply",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "20df9129-80da-4415-b720-2eb15b41f3c0",
+              "leftValue": "={{ ($json.from_address || '').toLowerCase() }}",
+              "rightValue": "no-reply",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "d63db650-d023-4716-9e86-cd07cd94f347",
+              "leftValue": "={{ ($json.from_address || '').toLowerCase() }}",
+              "rightValue": "newsletter",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "hack-platform-0",
+              "leftValue": "={{ ($json.from_address || '').toLowerCase() }}",
+              "rightValue": "devpost.com",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "hack-platform-1",
+              "leftValue": "={{ ($json.from_address || '').toLowerCase() }}",
+              "rightValue": "eventbrite.",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "hack-platform-2",
+              "leftValue": "={{ ($json.from_address || '').toLowerCase() }}",
+              "rightValue": "luma",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "hack-platform-3",
+              "leftValue": "={{ ($json.from_address || '').toLowerCase() }}",
+              "rightValue": "mlh.io",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "0cb463d5-688c-408f-89f7-b0cf7f12f17d",
+      "name": "Rule tags",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        680,
+        -120
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "500dba2b-e3e7-477c-803a-e2f36fcc912e",
+              "name": "message_id",
+              "value": "={{ $json.message_id }}",
+              "type": "string"
+            },
+            {
+              "id": "d07d85f0-163e-41a0-9e5c-fcf0d778561e",
+              "name": "mailbox",
+              "value": "={{ $json.mailbox }}",
+              "type": "string"
+            },
+            {
+              "id": "81331477-5042-421d-a58a-589269eedcf2",
+              "name": "source",
+              "value": "={{ $json.source }}",
+              "type": "string"
+            },
+            {
+              "id": "e8903fdb-be28-4465-a6d1-38081b68ef54",
+              "name": "from_name",
+              "value": "={{ $json.from_name }}",
+              "type": "string"
+            },
+            {
+              "id": "702352cb-8e02-44ec-aad6-c446a6757dae",
+              "name": "from_address",
+              "value": "={{ $json.from_address }}",
+              "type": "string"
+            },
+            {
+              "id": "a091a887-ffe0-4af4-9b5b-fcb9ae6d1d0b",
+              "name": "subject",
+              "value": "={{ $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "e2660410-9b54-4a8b-a6b5-09cc96d83f56",
+              "name": "received_at",
+              "value": "={{ $json.received_at }}",
+              "type": "string"
+            },
+            {
+              "id": "17034d35-884c-48cc-b6e0-33e37cf320b0",
+              "name": "body",
+              "value": "={{ ($json.body || '').slice(0, 4000) }}",
+              "type": "string"
+            },
+            {
+              "id": "8a648776-c811-442e-935a-d5cc63bb9a8b",
+              "name": "type",
+              "value": "={{ /devpost|eventbrite|luma|mlh\\.io|no-?reply/i.test($json.from_address || '') ? 'Platform notification' : 'Marketing' }}",
+              "type": "string"
+            },
+            {
+              "id": "1f9649e1-7566-46b0-83b1-42d95bff9bf5",
+              "name": "priority",
+              "value": "P3",
+              "type": "string"
+            },
+            {
+              "id": "b1521f48-baff-4378-832d-31eec1e91bc5",
+              "name": "sender",
+              "value": "Automated",
+              "type": "string"
+            },
+            {
+              "id": "4ff0b223-a22d-4749-aa18-689586ee28dd",
+              "name": "needs_reply",
+              "value": "false",
+              "type": "boolean"
+            },
+            {
+              "id": "02e40f9b-1d64-460f-ab61-548ca68da619",
+              "name": "summary",
+              "value": "={{ $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "8fb956bb-985d-4243-ab88-21007de86f8f",
+              "name": "next_step",
+              "value": "No reply needed",
+              "type": "string"
+            },
+            {
+              "id": "c9cad4d6-35be-490a-81dd-e419c7614b0a",
+              "name": "sorted_by",
+              "value": "rule",
+              "type": "string"
+            },
+            {
+              "id": "8ada123d-7ea3-4c3d-9b5d-2bb7221c4d21",
+              "name": "status",
+              "value": "open",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9a61eb9a-b339-4501-bad0-067db482dec6",
+      "name": "Sort with AI",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "onError": "continueRegularOutput",
+      "position": [
+        680,
+        120
+      ],
+      "parameters": {
+        "text": "=From: {{ $json.from_name }} <{{ $json.from_address }}>\nSubject: {{ $json.subject }}\n\n{{ ($json.body || '').slice(0, 4000) }}",
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"type\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"Registration\",\n        \"Team\",\n        \"Rules & judging\",\n        \"Submission\",\n        \"Sponsorship\",\n        \"Mentor/Judge\",\n        \"Volunteer\",\n        \"Logistics\",\n        \"Prizes & payouts\",\n        \"Media/press\",\n        \"Withdrawal\",\n        \"Code of conduct\",\n        \"Platform notification\",\n        \"Marketing\",\n        \"Other\"\n      ],\n      \"description\": \"The topic, chosen with the topic rules in the instructions.\"\n    },\n    \"priority\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"P1\",\n        \"P2\",\n        \"P3\"\n      ],\n      \"description\": \"P1, P2 or P3, chosen with the priority rules in the instructions.\"\n    },\n    \"sender\": {\n      \"type\": \"string\",\n      \"enum\": [\n        \"Participant\",\n        \"Sponsor\",\n        \"Mentor/Judge\",\n        \"Volunteer\",\n        \"Vendor/Venue\",\n        \"Press\",\n        \"Organiser\",\n        \"Automated\",\n        \"Other\"\n      ],\n      \"description\": \"Who wrote the email, chosen with the sender rules in the instructions.\"\n    },\n    \"needs_reply\": {\n      \"type\": \"boolean\",\n      \"description\": \"true if an organiser must answer this email, false for automatic messages, newsletters and simple thank-yous\"\n    },\n    \"summary\": {\n      \"type\": \"string\",\n      \"description\": \"What the email says, one short sentence, at most 15 words\"\n    },\n    \"next_step\": {\n      \"type\": \"string\",\n      \"description\": \"What the organisers should do next, at most 12 words, starting with a verb\"\n    }\n  },\n  \"required\": [\n    \"type\",\n    \"priority\",\n    \"sender\",\n    \"needs_reply\",\n    \"summary\",\n    \"next_step\"\n  ]\n}",
+        "options": {
+          "systemPromptTemplate": "You sort emails that arrive at the organisers of a hackathon. Read the email and fill in every field.\n\nChoose the topic (\"type\") by asking: what does this email mainly want? Pick exactly one:\n- Registration: ONLY signing up, tickets, a place on the waiting list, or confirming attendance.\n- Team: finding teammates, forming, changing or merging a team.\n- Rules & judging: what is allowed, eligibility of a project, judging criteria, scores, results.\n- Submission: handing in a project, deadlines, extensions, upload or Devpost problems.\n- Sponsorship: a company GIVING money or support to the hackathon as a sponsor: packages, benefits, logos, contracts, sponsor invoices.\n- Mentor/Judge: mentors or judges: invitations, availability, judging schedule.\n- Volunteer: offering to help, volunteer shifts.\n- Logistics: venue, power, WiFi, schedule, travel, accommodation, food and dietary needs, parking, accessibility, visa or invitation letters.\n- Prizes & payouts: prize money, paying winners, bank details.\n- Media/press: journalists, interviews, photos, filming, blog or social media requests.\n- Withdrawal: someone cancels or can no longer attend.\n- Code of conduct: harassment, feeling unsafe, discrimination, inappropriate behaviour, reports about another person.\n- Platform notification: automatic messages from Devpost, Eventbrite, Luma, MLH, Google Forms.\n- Marketing: newsletters, promotions, and suppliers trying to SELL us something (discounts, quotes for products or services).\n- Other: none of the above.\nMost emails are NOT Registration. A participant asking about food, rules, teams or submissions gets that topic, not Registration.\n\nChoose the sender: Participant, Sponsor, Mentor/Judge, Volunteer, Vendor/Venue (venue, catering, swag, printing or other supplier), Press, Organiser, Automated, or Other.\n\nPriority: P1 = answer today (code of conduct or safety, a problem during the event such as power or venue, a submission problem near the deadline, sponsor commitments, payments or prize money). P2 = answer this week (normal questions, registrations, teams, logistics, mentors, volunteers, press). P3 = no answer needed (thanks, FYI, notifications, newsletters).\n\nneeds_reply is true when an organiser must answer. summary: one short sentence, at most 15 words. next_step: what the organisers should do next, at most 12 words, starting with a verb.\n\nAnswer with the values only, as one JSON object with exactly these six keys. Do not repeat or describe the schema. The form is:\n{\"type\": \"<one topic from the list>\", \"priority\": \"<P1, P2 or P3>\", \"sender\": \"<one sender from the list>\", \"needs_reply\": <true or false>, \"summary\": \"<one short sentence>\", \"next_step\": \"<what to do next>\"}"
+        }
+      }
+    },
+    {
+      "id": "d2065f30-0029-4553-95b2-2c0cc5971eb5",
+      "name": "Ollama Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        680,
+        320
+      ],
+      "parameters": {
+        "model": "mistral:latest",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "credentials": {
+        "ollamaApi": {
+          "name": "Ollama (local)"
+        }
+      }
+    },
+    {
+      "id": "b399e080-5075-4a5a-9182-5daebdb670dc",
+      "name": "Save email",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "insert",
+        "dataTableId": {
+          "__rl": true,
+          "value": "MAILFLOW_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "MailFlow emails"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": []
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "97185b28-ea97-479e-a76d-5c0791594e36",
+      "name": "P1?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1540,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "841a1bad-8564-4117-b1e2-856b34e98dbd",
+              "leftValue": "={{ $json.priority }}",
+              "rightValue": "P1",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9635dcdb-fbbd-4433-9d87-be0013989e1f",
+      "name": "Telegram alert",
+      "webhookId": "179490ae-97d8-4bed-bb31-3c4aefee8670",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1760,
+        -20
+      ],
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=🔴 P1 email: answer today\nMailbox: {{ $json.mailbox }} · {{ $json.type }} · from a {{ $json.sender }}\nFrom: {{ $json.from_name }} <{{ $json.from_address }}>\nSubject: {{ $json.subject }}\n{{ $json.summary }}\nNext: {{ $json.next_step }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "name": "RI Email"
+        }
+      }
+    },
+    {
+      "id": "8091c915-81f1-49a5-a7e3-8f61ca63febc",
+      "name": "Email + AI answer",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.1,
+      "position": [
+        900,
+        120
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      }
+    },
+    {
+      "id": "42c6b0bc-7705-4de8-920c-f1defa5385a1",
+      "name": "AI tags",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1100,
+        120
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ca72de6e-0de8-40dc-b997-b3d1aa0129a6",
+              "name": "message_id",
+              "value": "={{ $json.message_id }}",
+              "type": "string"
+            },
+            {
+              "id": "dbb03772-0af0-415f-8964-7e1b8e6ff97b",
+              "name": "mailbox",
+              "value": "={{ $json.mailbox }}",
+              "type": "string"
+            },
+            {
+              "id": "31470788-7e4a-478e-bc1b-aa4b929d9805",
+              "name": "source",
+              "value": "={{ $json.source }}",
+              "type": "string"
+            },
+            {
+              "id": "168acc3e-9726-4f5a-81d0-9f513427a206",
+              "name": "from_name",
+              "value": "={{ $json.from_name }}",
+              "type": "string"
+            },
+            {
+              "id": "00ceb645-80f9-487b-99ae-a9d0082cecf9",
+              "name": "from_address",
+              "value": "={{ $json.from_address }}",
+              "type": "string"
+            },
+            {
+              "id": "6ae876cf-aa3a-4c51-97f1-dc6d37bbbc8b",
+              "name": "subject",
+              "value": "={{ $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "3cc0133c-9be2-4100-95f7-50fa99f1bfcb",
+              "name": "received_at",
+              "value": "={{ $json.received_at }}",
+              "type": "string"
+            },
+            {
+              "id": "bef0f0ae-a605-40be-aa3d-e76b873722d7",
+              "name": "body",
+              "value": "={{ ($json.body || '').slice(0, 4000) }}",
+              "type": "string"
+            },
+            {
+              "id": "f5c9f81a-37f7-4b31-b3f0-cd7862c32537",
+              "name": "type",
+              "value": "={{ $json.output ? $json.output.type : 'Other' }}",
+              "type": "string"
+            },
+            {
+              "id": "b5d89082-5551-4b98-b1a4-45bb27d5eb47",
+              "name": "priority",
+              "value": "={{ $json.output ? $json.output.priority : 'P2' }}",
+              "type": "string"
+            },
+            {
+              "id": "e7b24186-8dbc-4a30-853c-bb7c52310354",
+              "name": "sender",
+              "value": "={{ $json.output ? $json.output.sender : 'Other' }}",
+              "type": "string"
+            },
+            {
+              "id": "28da5ba9-4cc4-489a-a6e3-44c395694eb1",
+              "name": "needs_reply",
+              "value": "={{ $json.output ? $json.output.needs_reply : true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "58f542b5-7184-44d6-96d2-ceb15efeb07b",
+              "name": "summary",
+              "value": "={{ $json.output ? $json.output.summary : $json.subject }}",
+              "type": "string"
+            },
+            {
+              "id": "e3148474-a34e-4d95-8cfd-25c0b3d6d117",
+              "name": "next_step",
+              "value": "={{ $json.output ? $json.output.next_step : 'Sort this email by hand' }}",
+              "type": "string"
+            },
+            {
+              "id": "5bf82678-0254-42e0-b139-b540c7eb231c",
+              "name": "sorted_by",
+              "value": "={{ $json.output ? 'ai' : 'unsorted' }}",
+              "type": "string"
+            },
+            {
+              "id": "c8951241-5987-427d-9f07-edc68108484b",
+              "name": "status",
+              "value": "open",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "b0fc3dbb-3b8b-439e-b46e-03ca41d60494",
+      "name": "Has message id?",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        120,
+        -160
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "e64ce035-4531-430e-a79d-f22079de2c6e",
+              "leftValue": "={{ $json.message_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Has message id?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already saved?": {
+      "main": [
+        [
+          {
+            "node": "Obvious mail?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obvious mail?": {
+      "main": [
+        [
+          {
+            "node": "Rule tags",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sort with AI",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Email + AI answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort with AI": {
+      "main": [
+        [
+          {
+            "node": "Email + AI answer",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Rule tags": {
+      "main": [
+        [
+          {
+            "node": "Save email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI tags": {
+      "main": [
+        [
+          {
+            "node": "Save email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save email": {
+      "main": [
+        [
+          {
+            "node": "P1?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Sort with AI",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email + AI answer": {
+      "main": [
+        [
+          {
+            "node": "AI tags",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has message id?": {
+      "main": [
+        [
+          {
+            "node": "Already saved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "P1?": {
+      "main": [
+        [
+          {
+            "node": "Telegram alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "ERRORS_WORKFLOW_ID"
+  }
+}

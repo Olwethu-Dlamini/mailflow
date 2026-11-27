@@ -1,0 +1,55 @@
+{
+  "name": "MailFlow · Errors",
+  "nodes": [
+    {
+      "id": "e1",
+      "name": "When a MailFlow workflow fails",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "e2",
+      "name": "Telegram error alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "chatId": "YOUR_TELEGRAM_CHAT_ID",
+        "text": "=⚠️ MailFlow error\nWorkflow: {{ $json.workflow.name }}\nStep: {{ $json.execution.lastNodeExecuted || \"(unknown)\" }}\nError: {{ ($json.execution.error && $json.execution.error.message) || \"(no message)\" }}\nOpen: {{ $json.execution.url || \"n8n → Executions\" }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "name": "RI Email"
+        }
+      },
+      "webhookId": "31b5dc91-33f8-4db8-aca3-d576928a182d"
+    }
+  ],
+  "connections": {
+    "When a MailFlow workflow fails": {
+      "main": [
+        [
+          {
+            "node": "Telegram error alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

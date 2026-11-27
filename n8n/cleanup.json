@@ -1,0 +1,73 @@
+{
+  "name": "MailFlow · Cleanup",
+  "nodes": [
+    {
+      "id": "s1",
+      "name": "Every night at 02:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "c2",
+      "name": "Delete rows older than 90 days",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "value": "MAILFLOW_TABLE_ID",
+          "mode": "list",
+          "cachedResultName": "MailFlow emails"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "received_at",
+              "condition": "lt",
+              "keyValue": "={{ $now.minus({days: 90}).toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Every night at 02:00": {
+      "main": [
+        [
+          {
+            "node": "Delete rows older than 90 days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "errorWorkflow": "ERRORS_WORKFLOW_ID",
+    "executionOrder": "v1"
+  }
+}
