@@ -40,11 +40,21 @@ if ! grep -q "hostname: $HOST" "$CF"; then
   printf '%s\n' "$new" > "$CF"
 fi
 
+# The app believes Cf-Connecting-IP from srv1 (TRUSTED_PROXY), so only cloudflared on this host may
+# use the site: anyone reaching srv1:80 directly could otherwise choose the address the login lockout counts.
+GUARD="# MailFlow: only the local Cloudflare tunnel may use this site"
+if grep -q "^$HOST" "$CADDY" && ! grep -qF "$GUARD" "$CADDY"; then
+  # A block from before that rule: take it out; the new one is added below.
+  awk -v h="$HOST:80 {" '$0 == h {skip = 1} skip && /^}/ {skip = 0; next} !skip' "$CADDY" > "$CADDY.new"
+  cat "$CADDY.new" > "$CADDY" && rm -f "$CADDY.new"
+fi
 if ! grep -q "^$HOST" "$CADDY"; then
   cat >> "$CADDY" <<EOF
 
-# MailFlow web app on the ai VM. Logins are in the app itself (one account per person).
+$GUARD (logins are in the app itself)
 $HOST:80 {
+	@outside not remote_ip 127.0.0.1 ::1
+	respond @outside 403
 	reverse_proxy $APP
 }
 EOF

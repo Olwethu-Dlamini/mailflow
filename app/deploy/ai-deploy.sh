@@ -20,13 +20,15 @@ else
   git clone https://github.com/Olwethu-Dlamini/mailflow.git "$DIR"
 fi
 
+if [ -L "$STAGED" ]; then echo "$STAGED is a symlink: refusing to read it as root."; exit 1; fi
 if [ -f "$STAGED" ]; then
   # New settings without a key keep the key already in use: a new one would lock the saved SMTP passwords.
   if [ -f "$DIR/app/.env" ] && ! grep -q '^MAILFLOW_SECRET_KEY=..*' "$STAGED"; then
     (
       umask 077
-      { grep -v '^MAILFLOW_SECRET_KEY=' "$STAGED" || true; grep '^MAILFLOW_SECRET_KEY=..*' "$DIR/app/.env" || true; } > "$STAGED.new"
-      mv "$STAGED.new" "$STAGED"
+      tmp=$(mktemp "$STAGED.XXXXXX")  # a fresh file: root never writes through a planted symlink
+      { grep -v '^MAILFLOW_SECRET_KEY=' "$STAGED" || true; grep '^MAILFLOW_SECRET_KEY=..*' "$DIR/app/.env" || true; } > "$tmp"
+      mv -f "$tmp" "$STAGED"
     )
   fi
   install -m 600 -o root -g root "$STAGED" "$DIR/app/.env"
@@ -67,7 +69,9 @@ if [ -z "$(docker compose exec -T mailflow mailflow user list)" ]; then
 fi
 
 # Keep the copy in your home folder (sudo bash ~/mailflow-deploy.sh) the same as this one.
-install -m 755 -o "${SUDO_USER:-oll}" "$DIR/app/deploy/ai-deploy.sh" "/home/${SUDO_USER:-oll}/mailflow-deploy.sh"
+copy=$(mktemp "/home/${SUDO_USER:-oll}/.mailflow-deploy.XXXXXX")
+install -m 755 -o "${SUDO_USER:-oll}" "$DIR/app/deploy/ai-deploy.sh" "$copy"
+mv -f "$copy" "/home/${SUDO_USER:-oll}/mailflow-deploy.sh"  # rename replaces a symlink, never follows it
 
 echo
 echo "==> What the app's n8n API key may do (Integrations needs workflows and credentials)"

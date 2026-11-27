@@ -121,16 +121,27 @@ reports, before and after: [docs/lighthouse](../docs/lighthouse/README.md).
 - One account per person; an admin adds people under **Users**. Passwords are scrypt-hashed and
   need at least 12 characters.
 - **Continue with Google** (optional, below) opens a session only for an account an admin already
-  added: never a new account. The first Google sign-in links the account by its verified email;
-  after that Google's account id (`sub`) must match, so another Google account with that address
-  cannot take it over. A disabled account is refused either way.
-- 5 failed logins on one email lock it for 15 minutes; 20 from one address block that address.
+  added: never a new account. The first Google sign-in links the account by its verified email,
+  but only where Google owns the address (a Gmail address, or one in the Google Workspace domain
+  the sign-in names); anyone else signs in with their password. After that Google's account id
+  (`sub`) must match, so another Google account with that address cannot take it over. An admin's
+  password reset also removes the link. A disabled account is refused either way.
+- 5 failed logins on one email lock it for 15 minutes; 20 from one address (an IPv6 /64 counts as
+  one) block that address. Each attempt is counted before its password is checked, so attempts sent
+  at the same moment cannot get past the limit, and at most 2 passwords are checked at a time (each
+  check needs 16 MiB; the container has 128 MB): beyond that the answer is "try again in a moment".
   Behind srv1 the visitor's address comes from Cloudflare's `Cf-Connecting-IP`, believed only on
-  requests from `TRUSTED_PROXY`.
-- Sessions: HttpOnly, Secure, SameSite=Strict cookie; end after 12 h idle, 7 days, logout, a
-  password change or when the user is disabled.
+  requests from `TRUSTED_PROXY`; srv1's Caddy site accepts only the local Cloudflare tunnel, so
+  nobody can reach it around Cloudflare and choose that address.
+- Sessions: HttpOnly, Secure, SameSite=Strict cookie named `__Host-mf_session` (bound to this exact
+  host); signing in again ends the browser's previous session; sessions end after 12 h idle, 7 days,
+  logout, a password change or when the user is disabled.
 - Every change must carry `X-MailFlow: 1` and come from `SITE_ORIGIN`; strict Content Security
-  Policy, no inline script. Email text is always shown as text.
+  Policy, no inline script. Email text is always shown as text. Sender-chosen headers are cut to a
+  sane length (subject 500, name 200 characters…) and emails dated in the future are kept out of
+  the list, so one sender cannot crowd out or overload the queue. A Gmail reply goes out only for a
+  well-formed Message-ID.
+- Static files are cached for a year only under the current version's address.
 
 ## Continue with Google (optional)
 
@@ -189,7 +200,9 @@ The port is published on ai's LAN address only (`10.0.0.31:3100`, change with `M
 so the app is reached through srv1 and Cloudflare, not around them. The container runs read-only,
 without Linux capabilities, as a non-root user, in 128 MB.
 
-Update later: the same command, or `sudo bash ~/mailflow-deploy.sh`. Nothing changes on srv1.
+Update later: the same command, or `sudo bash ~/mailflow-deploy.sh`. srv1 changes only when
+[`deploy/srv1-publish.sh`](deploy/srv1-publish.sh) changes: run it again there (it replaces an
+older MailFlow site block with the tunnel-only one; since 2026-11-27).
 
 Accounts from the server: `sudo docker compose exec mailflow mailflow user list|reset|disable|enable --email …`.
 
