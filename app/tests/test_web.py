@@ -1,4 +1,5 @@
 import copy
+import dataclasses
 import json
 import re
 
@@ -352,3 +353,30 @@ def test_without_a_list_in_memory_the_page_does_not_wait_for_n8n(world):
     boot = boot_data(client.get("/?id=1").text)
     assert boot["me"]["email"] == "staff@example.com"
     assert "inbox" not in boot and "email" not in boot
+
+
+def test_the_page_carries_the_configured_time_zone():
+    store = Store(":memory:")
+    store.add_user("staff@example.com", "Staff", auth.hash_password(PASSWORD), is_admin=False)
+    settings = dataclasses.replace(SETTINGS, time_zone="Europe/London")
+    client = TestClient(create_app(settings, FakeEngine(), store), base_url=ORIGIN)
+    login(client)
+    boot = boot_data(client.get("/").text)
+    assert boot["me"]["email"] == "staff@example.com"
+    assert boot["timeZone"] == "Europe/London"
+
+
+def test_the_time_zone_defaults_to_mbabane_and_an_unknown_one_stops_start_up(monkeypatch):
+    from mailflow import config
+
+    for name, value in {"N8N_API_KEY": "k", "MAILFLOW_TABLE_ID": "t", "N8N_REPLY_SECRET": "s", "SITE_ORIGIN": ORIGIN,
+                        "TRUSTED_PROXY": "none"}.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.delenv("MAILFLOW_TIME_ZONE", raising=False)
+    assert config.from_env().time_zone == "Africa/Mbabane"
+    monkeypatch.setenv("MAILFLOW_TIME_ZONE", "Europe/London")
+    assert config.from_env().time_zone == "Europe/London"
+    for wrong in ("Mars/Olympus_Mons", "../../etc/passwd"):
+        monkeypatch.setenv("MAILFLOW_TIME_ZONE", wrong)
+        with pytest.raises(SystemExit, match="MAILFLOW_TIME_ZONE"):
+            config.from_env()

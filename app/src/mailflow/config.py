@@ -1,6 +1,7 @@
 """Settings, read once from the environment (on the server: /opt/mailflow/.env)."""
 
 import os
+import zoneinfo
 from dataclasses import dataclass
 
 from .vault import valid_key
@@ -22,6 +23,8 @@ class Settings:
     # "Continue with Google": on only when both are set (Google Cloud → Clients → Web application)
     google_client_id: str = ""
     google_client_secret: str = ""
+    # The zone every date and time on the page is shown in (IANA name, e.g. Europe/London)
+    time_zone: str = "Africa/Mbabane"
 
 
 def _need(name: str) -> str:
@@ -46,6 +49,15 @@ def _secret_key() -> str:
     return key
 
 
+def _time_zone() -> str:
+    name = os.environ.get("MAILFLOW_TIME_ZONE", "").strip() or "Africa/Mbabane"
+    try:
+        zoneinfo.ZoneInfo(name)
+    except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+        raise SystemExit(f"MAILFLOW_TIME_ZONE={name!r} is not a known time zone (use an IANA name like Europe/London)") from None
+    return name
+
+
 def from_env() -> Settings:
     n8n_url = os.environ.get("N8N_URL", "http://n8n:5678").rstrip("/")
     google_client_id, google_client_secret = _google()
@@ -64,4 +76,5 @@ def from_env() -> Settings:
         google_client_id=google_client_id,
         google_client_secret=google_client_secret,
         secret_key=_secret_key(),
+        time_zone=_time_zone(),
     )

@@ -196,9 +196,22 @@ n8n API key may do (the emails table, workflows, credentials), that the site ans
 Cloudflare, and lists what is left to do in a browser. It also keeps `~/mailflow-deploy.sh` the
 same as itself.
 
-The port is published on ai's LAN address only (`10.0.0.31:3100`, change with `MAILFLOW_BIND`),
-so the app is reached through srv1 and Cloudflare, not around them. The container runs read-only,
-without Linux capabilities, as a non-root user, in 128 MB.
+The port is published on ai's LAN address only (`10.0.0.31:3100`, change with `MAILFLOW_BIND` and
+`MAILFLOW_PORT`), so the app is reached through srv1 and Cloudflare, not around them. The container
+runs read-only, without Linux capabilities, as a non-root user, in 128 MB.
+
+Run with nothing extra set, the script does what it always did for the owner's copy. Its settings,
+given on the command line (`sudo MAILFLOW_DIR=/srv/mailflow bash ai-deploy.sh`):
+
+| Setting | Default | What it does |
+|---|---|---|
+| `MAILFLOW_REPO` | `https://github.com/Olwethu-Dlamini/mailflow.git` | The repository cloned on a first deploy |
+| `MAILFLOW_DIR` | `/opt/mailflow` | Where it is cloned; the settings go to `MAILFLOW_DIR/app/.env` |
+| `MAILFLOW_SITE` | `SITE_ORIGIN` from the settings | The address checked at the end; asked for if both are empty |
+| `MAILFLOW_BIND`, `MAILFLOW_PORT` | from the settings, else `10.0.0.31`, `3100` | Where the app is published and checked |
+| `AUTOMATION_NETWORK` | from the settings, else `automation_default` | n8n's Docker network |
+
+The first admin's name and email are asked for when there are no accounts yet.
 
 Update later: the same command, or `sudo bash ~/mailflow-deploy.sh`. srv1 changes only when
 [`deploy/srv1-publish.sh`](deploy/srv1-publish.sh) changes: run it again there (it replaces an
@@ -220,7 +233,108 @@ line above the 404 catch-all and this Caddy block, validates both (and restores 
 either fails), adds the DNS record, then reloads Caddy and restarts the tunnel:
 
 ```caddyfile
+# MailFlow: only the local Cloudflare tunnel may use this site (logins are in the app itself)
 mailflow.22112002.xyz:80 {
+	@outside not remote_ip 127.0.0.1 ::1
+	respond @outside 403
 	reverse_proxy 10.0.0.31:3100
 }
 ```
+
+Another name or app address: `sudo bash srv1-publish.sh HOST APP` (or `MAILFLOW_HOST` and
+`MAILFLOW_APP`), for example `sudo bash srv1-publish.sh mail.example.com 192.168.1.20:3100`. With
+neither, it publishes `mailflow.22112002.xyz` from `10.0.0.31:3100`. It needs a host where
+cloudflared (a named tunnel, with a `- service: http_status:404` catch-all in
+`/etc/cloudflared/config.yml`) and Caddy (`/etc/caddy/Caddyfile`) already run, and a Cloudflare
+login for the account that runs `sudo`.
+
+## Backups
+
+On the app host, as root:
+
+```bash
+sudo bash /opt/mailflow/app/deploy/backup.sh
+```
+
+[`deploy/backup.sh`](deploy/backup.sh) copies the app's SQLite file out of the running container
+with SQLite's backup API (a consistent copy while the app writes), and copies the `.env` next to
+it: the `.env` holds `MAILFLOW_SECRET_KEY`, and without it the saved SMTP passwords in the copy
+cannot be opened. Both go to `/var/backups/mailflow` (root only, files mode 600). It keeps the
+newest 14 of each and lists what it kept. Settings: `MAILFLOW_DIR` (default `/opt/mailflow`),
+`MAILFLOW_BACKUP_DIR` (default `/var/backups/mailflow`), `MAILFLOW_BACKUP_KEEP` (default 14).
+
+Every night at 02:30, as `/etc/cron.d/mailflow-backup`:
+
+```cron
+30 2 * * * root bash /opt/mailflow/app/deploy/backup.sh >/var/log/mailflow-backup.log 2>&1
+```
+
+Copy the folder to another machine as well; a backup on the same disk does not survive the disk.
+
+To restore, in `/opt/mailflow/app` as root (`<time>` is the copy you want). The database is
+written by the app's own user, and the old one's `-wal` and `-shm` files are removed so they are
+not applied to the restored copy:
+
+```bash
+install -m 600 -o root -g root /var/backups/mailflow/env-<time> .env
+docker compose stop mailflow
+docker compose run --rm --no-deps -T mailflow sh -c \
+  'cat > /data/mailflow.db.new && rm -f /data/mailflow.db-wal /data/mailflow.db-shm && mv /data/mailflow.db.new /data/mailflow.db' \
+  < /var/backups/mailflow/mailflow-<time>.db
+docker compose up -d
+```
+
+**This does not back up n8n.** The emails themselves, the workflows and the credentials (Gmail,
+the AI, SMTP) live in n8n. Back them up with n8n's own tools, inside the n8n container (named `n8n`
+here; `docker ps` shows the name), then copy the files out:
+
+```bash
+docker exec -u node n8n n8n export:workflow --all --output=/tmp/workflows.json
+docker exec -u node n8n n8n export:credentials --all --output=/tmp/credentials.json
+docker cp n8n:/tmp/workflows.json . && docker cp n8n:/tmp/credentials.json .
+```
+
+`export:credentials` writes them encrypted with n8n's own encryption key (`N8N_ENCRYPTION_KEY`, or
+the `encryptionKey` in `/home/node/.n8n/config`): keep that key too, or the export cannot be
+imported. The `MailFlow emails` data table lives in n8n's database (SQLite in the n8n volume, or
+Postgres if n8n uses it); neither export includes it, so back up that database as well, for
+example a copy of the n8n volume with n8n stopped, or `pg_dump` for Postgres.
+
+## Install for a new customer
+
+One copy per customer: their own n8n, their own app, their own settings. The steps:
+
+1. **n8n.** Import the MailFlow workflows from the repo's [`n8n/`](../n8n/) folder and set up
+   their credentials, as [`n8n/README.md`](../n8n/README.md) describes. Note the id of the
+   `MailFlow emails` data table and the value of the `MailFlow app secret` credential.
+2. **Settings.** Copy [`.env.example`](.env.example) to `~/mailflow.env` on the host that runs
+   n8n (mode 600) and fill it in:
+
+   | Setting | Required | What it does |
+   |---|---|---|
+   | `N8N_API_KEY` | yes | The app's key for n8n's API (n8n → Settings → n8n API) |
+   | `MAILFLOW_TABLE_ID` | yes | The `MailFlow emails` data table's id |
+   | `N8N_REPLY_SECRET` | yes | The value of the `MailFlow app secret` credential |
+   | `SITE_ORIGIN` | yes | The public address, like `https://mail.example.com` |
+   | `TRUSTED_PROXY` | yes | The LAN address of the proxy in front of the app (`none` only for testing) |
+   | `MAILFLOW_BIND` | yes, on a new host | This host's LAN address the proxy reaches (default `10.0.0.31`) |
+   | `MAILFLOW_PORT` | no | The published port (default `3100`) |
+   | `AUTOMATION_NETWORK` | no | n8n's Docker network (default `automation_default`; see `docker network ls`) |
+   | `N8N_URL` | no | n8n inside that network (default `http://n8n:5678`) |
+   | `N8N_REPLY_URL` | no | The reply webhook (default `N8N_URL/webhook/mailflow/reply`) |
+   | `MAILFLOW_TIME_ZONE` | no | The zone the page shows times in (default `Africa/Mbabane`); an unknown name stops start-up |
+   | `COOKIE_SECURE` | no | `true`; `false` only for testing over plain http |
+   | `DB_PATH` | no | The app's SQLite file (default `/data/mailflow.db`, in the volume) |
+   | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | "Continue with Google": both or neither |
+   | `MAILFLOW_SECRET_KEY` | no | Made by the deploy script on the first deploy; keep it |
+
+3. **Deploy.** Run [`deploy/ai-deploy.sh`](deploy/ai-deploy.sh) with `sudo` from your own account
+   on that host, with `MAILFLOW_REPO` set if the code comes from another copy of the repository
+   (see "Deploy on `ai`" for its settings). It asks for the first admin's name and email.
+4. **Publish.** Put a proxy with HTTPS in front of the app. With a Cloudflare tunnel and Caddy:
+   `sudo bash deploy/srv1-publish.sh HOST APP` on the proxy host. Any other proxy works if it
+   serves only `SITE_ORIGIN`, sends `Cf-Connecting-IP` or reaches the app from `TRUSTED_PROXY`, and
+   cannot be bypassed.
+5. **Backups.** Install the cron line from "Backups", and back up n8n as described there.
+
+Updates later: `sudo bash ~/mailflow-deploy.sh` on the app host.

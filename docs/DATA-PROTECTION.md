@@ -78,8 +78,8 @@ This copy goes away when the app stops.
 
 The app writes short lines to its container log: which team member changed an email's status or
 replied (by email address and row id), and which admin connected a mailbox (sign-in name and
-server). No email text. The log is kept for as long as Docker keeps it; `app/docker-compose.yml`
-sets no limit, so set one in Docker if you need it.
+server). No email text. Docker keeps at most three log files of 10 MB each
+(`app/docker-compose.yml`), so older lines drop off on their own.
 
 ### In the browser
 

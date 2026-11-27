@@ -268,7 +268,7 @@ def create_app(
         # The account, the list and the open email ride along with the page, so it shows them
         # without three more round trips. Only what is in memory: the page never waits for n8n.
         q = request.query_params
-        boot = {"me": _user_json(user), "google": google is not None}
+        boot = {"me": _user_json(user), "google": google is not None, "timeZone": settings.time_zone}
         if engine.ready:
             boot["inbox"] = await _inbox_json(q.get("view", "reply"), q.get("mailbox", ""), q.get("topic", ""), q.get("sender", ""), user)
             wanted = q.get("id", "")

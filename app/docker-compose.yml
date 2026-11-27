@@ -1,7 +1,8 @@
-# MailFlow web app on `ai`, next to the automation stack (DDOService, /opt/automation).
-# It joins that stack's network so it reaches n8n as http://n8n:5678; n8n's own port is not needed.
-# Published only on ai's LAN address (10.0.0.31:3100) for srv1's Caddy (mailflow.22112002.xyz),
-# so it is not reachable around Cloudflare from the tailnet. Secrets come from .env (see .env.example).
+# MailFlow web app, on the host that runs n8n's Docker stack (`ai` and /opt/automation for the owner's copy).
+# It joins that stack's network (AUTOMATION_NETWORK) so it reaches n8n as http://n8n:5678; n8n's own
+# port is not needed. Published only on MAILFLOW_BIND:MAILFLOW_PORT (default 10.0.0.31:3100, ai's LAN
+# address, for srv1's Caddy), so it is not reachable around the proxy and Cloudflare. All three are
+# read from .env or the shell; secrets come from .env (see .env.example).
 
 services:
   mailflow:
@@ -24,7 +25,14 @@ services:
       - no-new-privileges:true
     cpus: 0.5
     mem_limit: 128m
+    pids_limit: 128
     restart: unless-stopped
+    # The log names who changed which email (docs/DATA-PROTECTION.md): keep it small and short-lived.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   automation:

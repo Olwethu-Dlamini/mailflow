@@ -29,7 +29,20 @@ const BUTTONS = {
   done: [["open", "Reopen", "", "undo", "U", "Back to open"]],
 };
 const REFRESH_MS = 60_000;
-const TIME_ZONE = "Africa/Mbabane";
+// The zone set on the server (MAILFLOW_TIME_ZONE, in the boot data; the script is deferred, so the
+// element is already there). Missing, or unknown to this browser: the browser's own zone.
+const TIME_ZONE = (() => {
+  try {
+    const zone = JSON.parse(document.getElementById("boot")?.textContent || "{}").timeZone;
+    if (zone) {
+      new Intl.DateTimeFormat("en-GB", { timeZone: zone });
+      return zone;
+    }
+  } catch {
+    // unreadable boot data, or a zone this browser does not know
+  }
+  return undefined;
+})();
 const listTime = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 const fullTime = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, weekday: "short", day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 const clockTime = new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit" });
