@@ -45,8 +45,11 @@ fi
 GUARD="# MailFlow: only the local Cloudflare tunnel may use this site"
 if grep -q "^$HOST" "$CADDY" && ! grep -qF "$GUARD" "$CADDY"; then
   # A block from before that rule: take it out; the new one is added below.
-  awk -v h="$HOST:80 {" '$0 == h {skip = 1} skip && /^}/ {skip = 0; next} !skip' "$CADDY" > "$CADDY.new"
+  old="# MailFlow web app on the ai VM. Logins are in the app itself (one account per person)."
+  awk -v h="$HOST:80 {" -v c="$old" '$0 == c {next} $0 == h {skip = 1} skip && /^}/ {skip = 0; next} !skip' "$CADDY" > "$CADDY.new"
   cat "$CADDY.new" > "$CADDY" && rm -f "$CADDY.new"
+  # Stop rather than report success over an unguarded block this could not recognise.
+  if grep -q "^$HOST" "$CADDY"; then echo "An unguarded $HOST block in $CADDY was not removed: edit it by hand."; restore; fi
 fi
 if ! grep -q "^$HOST" "$CADDY"; then
   cat >> "$CADDY" <<EOF

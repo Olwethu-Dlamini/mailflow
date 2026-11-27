@@ -155,9 +155,8 @@ def google_resume(store: Store, state: str, now: float) -> tuple[str, str] | Non
 
 
 def _prune(store: Store, now: float) -> None:
-    if 0 <= now - store.pruned_at < PRUNE_EVERY:  # the deletes scan whole tables under the store's lock
+    if not store.claim_prune(now, PRUNE_EVERY):  # the deletes scan whole tables under the store's lock
         return
-    store.pruned_at = now
     store.prune(
         failures_before=now - 24 * 3600, sessions_before=now - MAX_SECONDS, notes_before=now - NOTES_SECONDS,
         starts_before=now - GOOGLE_START_SECONDS,
@@ -175,6 +174,8 @@ def google_login(store: Store, identity: Identity, now: float) -> tuple[str, Use
         by_email = store.user_by_email(identity.email)
         if by_email and by_email.active and store.link_google(by_email.id, identity.sub):
             user = store.user_by_id(by_email.id)
+        else:
+            user = store.user_by_google_sub(identity.sub)  # another sign-in of this same account linked it first
     if user is None or not user.active:
         raise LoginRefused(NO_GOOGLE_ACCOUNT)
     return _open_session(store, user, now)

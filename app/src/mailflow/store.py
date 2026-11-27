@@ -97,7 +97,7 @@ class Store:
         self._db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
         self._db.row_factory = sqlite3.Row
         self._lock = threading.Lock()
-        self.pruned_at = float("-inf")  # when auth last cleaned up old rows (it does so at most once a minute)
+        self._pruned_at = float("-inf")  # when auth last cleaned up old rows (claim_prune)
         with self._lock:
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.executescript(SCHEMA)
@@ -209,6 +209,14 @@ class Store:
         """Take back attempts counted by try_attempt (the password was right)."""
         with self._lock:
             self._db.executemany("DELETE FROM login_failures WHERE rowid = ?", [(i,) for i in ids])
+
+    def claim_prune(self, now: float, every: float) -> bool:
+        """True (and noted) if the last clean-up was `every` seconds ago or more; one caller at a time."""
+        with self._lock:
+            if 0 <= now - self._pruned_at < every:
+                return False
+            self._pruned_at = now
+            return True
 
     def forget_failures(self, key: str) -> None:
         self._run("DELETE FROM login_failures WHERE key = ?", (key,))

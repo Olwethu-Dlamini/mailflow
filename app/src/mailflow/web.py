@@ -207,7 +207,7 @@ def create_app(
         # (Signed out, / is the public welcome page; it varies with the cookie, so it is not stored either.)
         if request.url.path.startswith(("/api/", "/auth/")) or request.url.path == "/":
             response.headers["Cache-Control"] = "no-store"
-        elif request.url.path.startswith("/static/") and request.query_params.get("v") == version and response.status_code == 200:
+        elif request.url.path.startswith("/static/") and request.query_params.get("v") == version and response.status_code in (200, 304):
             # Only this version's files: an old or future ?v, or a missing file, must not stay in a
             # shared cache for a year (the next version's hash can be worked out from the source).
             response.headers["Cache-Control"] = YEAR
@@ -370,7 +370,7 @@ def create_app(
         try:
             auth.check_current_password(store, user, body.current, client_ip(request), clock())
         except auth.LoginRefused as refused:
-            raise ApiError(400, str(refused)) from None
+            raise ApiError(429 if str(refused) == auth.BUSY else 400, str(refused)) from None
         try:
             auth.check_password_rule(body.new)
         except ValueError as error:
