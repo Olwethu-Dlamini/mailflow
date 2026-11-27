@@ -12,7 +12,7 @@ import smtplib
 import ssl
 from dataclasses import asdict, dataclass
 from email.message import EmailMessage
-from email.utils import formataddr, formatdate, make_msgid, parseaddr
+from email.utils import formataddr, formatdate, make_msgid
 
 TIMEOUT = 20
 SECURITY = ("ssl", "starttls")
@@ -132,9 +132,12 @@ def reply_message(smtp: Smtp, to_name: str, to_address: str, subject: str, messa
         raise MailError("This email has no sender address to answer.")
     subject = _one_line(subject) or "(no subject)"
     message = EmailMessage()
-    message["From"] = formataddr((_one_line(smtp.from_name), smtp.from_address))
-    message["To"] = formataddr((_one_line(to_name), to_address))
-    message["Subject"] = subject if subject.lower().startswith("re:") else f"Re: {subject}"
+    try:
+        message["From"] = formataddr((_one_line(smtp.from_name), smtp.from_address))
+        message["To"] = formataddr((_one_line(to_name), to_address))
+        message["Subject"] = subject if subject.lower().startswith("re:") else f"Re: {subject}"
+    except ValueError:  # an encoded name or subject that decodes to a line break
+        raise MailError("This email's sender name or subject cannot go into a reply. Answer it from your mail app.") from None
     message["Date"] = formatdate(usegmt=True)
     message["Message-ID"] = make_msgid(domain=smtp.from_address.rpartition("@")[2] or None)
     message_id = message_id.strip()
@@ -145,12 +148,13 @@ def reply_message(smtp: Smtp, to_name: str, to_address: str, subject: str, messa
     return message
 
 
-def send(smtp: Smtp, password: str, message: EmailMessage) -> None:
+def send(smtp: Smtp, password: str, message: EmailMessage, to_address: str) -> None:
+    """Deliver to `to_address` only: the one reply_message checked, whatever the To header holds."""
+
     def deliver():
         server = _open_smtp(smtp, password)
         try:
-            # Only the one checked address receives it, whatever else the To header might hold.
-            server.send_message(message, from_addr=parseaddr(message["From"])[1], to_addrs=[parseaddr(message["To"])[1]])
+            server.send_message(message, from_addr=smtp.from_address, to_addrs=[to_address.strip()])
         finally:
             server.quit()
 

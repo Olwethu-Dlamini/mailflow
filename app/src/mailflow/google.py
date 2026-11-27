@@ -41,6 +41,17 @@ class Identity:
     sub: str  # Google's stable account id; the email can change
     email: str
     name: str
+    # Google owns the address: a Gmail address, or one in the Workspace domain the token names (hd).
+    # Only then may a first sign-in link an account by its email (auth.google_login).
+    authoritative: bool = False
+
+
+GMAIL = ("gmail.com", "googlemail.com")
+
+
+def _authoritative(email: str, hd: str) -> bool:
+    domain = email.rpartition("@")[2]
+    return domain in GMAIL or (bool(hd) and domain == hd.strip().lower())
 
 
 def _b64url(data: bytes) -> str:
@@ -111,4 +122,6 @@ class GoogleLogin:
         failed = [name for name, ok in checks.items() if not ok]
         if failed:
             raise GoogleRefused(f"ID token failed: {', '.join(failed)}")
-        return Identity(str(claims["sub"]), email, str(claims.get("name") or ""))
+        return Identity(
+            str(claims["sub"]), email, str(claims.get("name") or ""), _authoritative(email, str(claims.get("hd") or ""))
+        )

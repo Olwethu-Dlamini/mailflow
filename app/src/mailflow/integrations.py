@@ -249,13 +249,15 @@ def collector_workflow(label: str, credential: dict, process_id: str, errors_id:
                 "parameters": {
                     "assignments": {
                         "assignments": [
-                            _field("message_id", "={{ $json.messageId || ('<' + $json.date + '|' + $json.subject + '>') }}"),
+                            # Every sender-chosen header is cut to a sane length (only the body was),
+                            # and a Date in the future (or one that is no date) becomes the time it arrived.
+                            _field("message_id", "={{ String($json.messageId || ('<' + $json.date + '|' + $json.subject + '>')).slice(0, 998) }}"),
                             _field("mailbox", label),
                             _field("source", "imap"),
-                            _field("from_name", f"={{{{ ({first} && $json.from.value[0].name) || '' }}}}"),
-                            _field("from_address", f"={{{{ ({first} && $json.from.value[0].address) || '' }}}}"),
-                            _field("subject", "={{ $json.subject || '(no subject)' }}"),
-                            _field("received_at", "={{ $json.date ? new Date($json.date).toISOString() : $now.toISO() }}"),
+                            _field("from_name", f"={{{{ String(({first} && $json.from.value[0].name) || '').slice(0, 200) }}}}"),
+                            _field("from_address", f"={{{{ String(({first} && $json.from.value[0].address) || '').slice(0, 320) }}}}"),
+                            _field("subject", "={{ String($json.subject || '(no subject)').slice(0, 500) }}"),
+                            _field("received_at", "={{ $json.date && new Date($json.date) <= new Date() ? new Date($json.date).toISOString() : $now.toISO() }}"),
                             _field("body", body),
                         ]
                     },

@@ -97,6 +97,7 @@ class Store:
         self._db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
         self._db.row_factory = sqlite3.Row
         self._lock = threading.Lock()
+        self.pruned_at = float("-inf")  # when auth last cleaned up old rows (it does so at most once a minute)
         with self._lock:
             self._db.execute("PRAGMA journal_mode=WAL")
             self._db.executescript(SCHEMA)
@@ -144,8 +145,14 @@ class Store:
         rows = self._run("SELECT * FROM users WHERE google_sub = ?", (sub,))
         return self._user(rows[0] if rows else None)
 
-    def link_google(self, user_id: int, sub: str) -> None:
-        self._run("UPDATE users SET google_sub = ? WHERE id = ? AND google_sub IS NULL", (sub, user_id))
+    def link_google(self, user_id: int, sub: str) -> bool:
+        """Link only an unlinked account; False when another sign-in linked it first."""
+        with self._lock:
+            cursor = self._db.execute("UPDATE users SET google_sub = ? WHERE id = ? AND google_sub IS NULL", (sub, user_id))
+            return cursor.rowcount == 1
+
+    def unlink_google(self, user_id: int) -> None:
+        self._run("UPDATE users SET google_sub = NULL WHERE id = ?", (user_id,))
 
     def set_password(self, user_id: int, pw_hash: str) -> None:
         """New password; every session of that user ends."""
@@ -180,20 +187,37 @@ class Store:
 
     # failed logins
 
-    def add_failure(self, key: str, now: float) -> None:
-        self._run("INSERT INTO login_failures VALUES (?, ?)", (key, now))
+    def add_failure(self, key: str, now: float) -> int:
+        with self._lock:
+            return self._db.execute("INSERT INTO login_failures VALUES (?, ?)", (key, now)).lastrowid
 
     def failures_since(self, key: str, since: float) -> int:
         return self._run("SELECT COUNT(*) FROM login_failures WHERE key = ? AND at > ?", (key, since))[0][0]
 
+    def try_attempt(self, limits: list[tuple[str, int]], since: float, now: float) -> list[int] | None:
+        """Count one attempt against every (key, limit) before the password is checked, in one step,
+        so attempts running at the same time cannot all slip under a limit. None (and nothing
+        written) when a key already reached its limit; else the ids of the rows written."""
+        with self._lock:
+            for key, limit in limits:
+                count = self._db.execute("SELECT COUNT(*) FROM login_failures WHERE key = ? AND at > ?", (key, since)).fetchone()[0]
+                if count >= limit:
+                    return None
+            return [self._db.execute("INSERT INTO login_failures VALUES (?, ?)", (key, now)).lastrowid for key, _ in limits]
+
+    def drop_attempts(self, ids: list[int]) -> None:
+        """Take back attempts counted by try_attempt (the password was right)."""
+        with self._lock:
+            self._db.executemany("DELETE FROM login_failures WHERE rowid = ?", [(i,) for i in ids])
+
     def forget_failures(self, key: str) -> None:
         self._run("DELETE FROM login_failures WHERE key = ?", (key,))
 
-    def prune(self, failures_before: float, sessions_before: float, notes_before: float) -> None:
+    def prune(self, failures_before: float, sessions_before: float, notes_before: float, starts_before: float) -> None:
         """Drop failed logins, sessions, abandoned Google sign-ins and notes too old to matter."""
         self._run("DELETE FROM login_failures WHERE at < ?", (failures_before,))
         self._run("DELETE FROM sessions WHERE created_at < ?", (sessions_before,))
-        self._run("DELETE FROM google_starts WHERE created_at < ?", (failures_before,))
+        self._run("DELETE FROM google_starts WHERE created_at < ?", (starts_before,))
         self._run("DELETE FROM assignments WHERE at < ?", (notes_before,))
         self._run("DELETE FROM activity WHERE at < ?", (notes_before,))
 
@@ -278,8 +302,15 @@ class Store:
 
     # Google sign-in in progress: one row per click on "Continue with Google", used once
 
-    def add_google_start(self, state_hash: str, verifier: str, nonce: str, now: float) -> None:
-        self._run("INSERT INTO google_starts VALUES (?, ?, ?, ?)", (state_hash, verifier, nonce, now))
+    def add_google_start(self, state_hash: str, verifier: str, nonce: str, now: float, expired_before: float, cap: int) -> bool:
+        """Store a start, dropping expired ones first; False (nothing stored) when `cap` unexpired
+        starts are already waiting, so anonymous clicks cannot grow the table without limit."""
+        with self._lock:
+            self._db.execute("DELETE FROM google_starts WHERE created_at <= ?", (expired_before,))
+            if self._db.execute("SELECT COUNT(*) FROM google_starts").fetchone()[0] >= cap:
+                return False
+            self._db.execute("INSERT INTO google_starts VALUES (?, ?, ?, ?)", (state_hash, verifier, nonce, now))
+            return True
 
     def take_google_start(self, state_hash: str, since: float) -> tuple[str, str] | None:
         """(verifier, nonce) of a start made after `since`; the row is gone afterwards either way."""

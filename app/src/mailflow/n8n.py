@@ -26,6 +26,10 @@ log = logging.getLogger(__name__)
 PAGE = 250  # the n8n API's maximum page size
 DAYS = 30  # the queue shows the last 30 days, like the n8n Inbox page did
 ROW_CAP = 3000  # most rows read for one list; ~4.5 KB each, so ~13 MB at worst
+FUTURE_SKEW = timedelta(days=1)  # a Date header up to a day ahead is a wrong clock; beyond that it is not listed
+# The longest text kept per field from n8n. Senders choose these headers, and only the body is cut by
+# the collectors, so the list (and the row cap above) stays bounded in memory whatever arrives.
+FIELD_LIMITS = {"subject": 500, "from_name": 200, "from_address": 320, "summary": 1000, "next_step": 500, "message_id": 998, "body": 20_000}
 CACHE_SECONDS = 15
 STALE_SECONDS = 6 * 3600
 STATUSES = ("open", "waiting", "done")
@@ -36,8 +40,17 @@ class EngineDown(Exception):
     """n8n could not be reached, refused the app's credentials, or answered something unexpected."""
 
 
-def _filter(column: str, condition: str, value) -> str:
-    return json.dumps({"type": "and", "filters": [{"columnName": column, "condition": condition, "value": value}]})
+def _filter(column: str, condition: str, value, *more: tuple[str, str, object]) -> str:
+    filters = [{"columnName": c, "condition": op, "value": v} for c, op, v in ((column, condition, value), *more)]
+    return json.dumps({"type": "and", "filters": filters})
+
+
+def _trim(row: dict) -> dict:
+    for field, limit in FIELD_LIMITS.items():
+        value = row.get(field)
+        if isinstance(value, str) and len(value) > limit:
+            row[field] = value[:limit]
+    return row
 
 
 class Engine:
@@ -109,12 +122,16 @@ class Engine:
 
     async def _read(self) -> list[dict]:
         started = self._clock()
-        since = (self._now() - timedelta(days=DAYS)).astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-        params = {"limit": str(PAGE), "sortBy": "received_at:desc", "filter": _filter("received_at", "gte", since)}
+        now = self._now().astimezone(UTC)
+        since = (now - timedelta(days=DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        # Bounded on both sides: emails dated in the future by their sender would otherwise sort
+        # first, never age out, and could fill the row cap ahead of every real email.
+        until = (now + FUTURE_SKEW).strftime("%Y-%m-%dT%H:%M:%SZ")
+        params = {"limit": str(PAGE), "sortBy": "received_at:desc", "filter": _filter("received_at", "gte", since, ("received_at", "lte", until))}
         rows: list[dict] = []
         while True:
             body = (await self._call("GET", self._rows_url, params=params, headers=self._headers)).json()
-            rows.extend(body.get("data", []))
+            rows.extend(_trim(row) for row in body.get("data", []))
             cursor = body.get("nextCursor")
             if not cursor or len(rows) >= ROW_CAP:
                 break
@@ -154,7 +171,7 @@ class Engine:
         params = {"limit": "1", "filter": _filter("id", "eq", row_id)}
         body = (await self._call("GET", self._rows_url, params=params, headers=self._headers)).json()
         data = body.get("data", [])
-        return data[0] if data else None
+        return _trim(data[0]) if data else None
 
     async def set_status(self, row_id: int, to: str) -> None:
         if to not in STATUSES:

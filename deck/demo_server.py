@@ -114,6 +114,8 @@ def _matches(row: dict, filter_json: str | None) -> bool:
             return False
         if f["condition"] == "gte" and str(value) < str(f["value"]):
             return False
+        if f["condition"] == "lte" and str(value) > str(f["value"]):
+            return False
     return True
 
 

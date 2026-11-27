@@ -27,7 +27,7 @@ def engine(handler, clock=None):
     return Engine(SETTINGS, transport=httpx.MockTransport(handler), now=lambda: NOW, clock=clock or (lambda: 0.0))
 
 
-async def test_recent_rows_follows_the_cursor_and_filters_30_days():
+async def test_recent_rows_follows_the_cursor_and_filters_30_days_up_to_tomorrow():
     seen = []
 
     def handler(request):
@@ -44,8 +44,25 @@ async def test_recent_rows_follows_the_cursor_and_filters_30_days():
     assert first["sortBy"] == "received_at:desc"
     assert json.loads(first["filter"]) == {
         "type": "and",
-        "filters": [{"columnName": "received_at", "condition": "gte", "value": "2026-10-20T12:00:00Z"}],
+        "filters": [
+            {"columnName": "received_at", "condition": "gte", "value": "2026-10-20T12:00:00Z"},
+            # Emails dated far ahead by their sender stay out of the list instead of sorting first.
+            {"columnName": "received_at", "condition": "lte", "value": "2026-11-20T12:00:00Z"},
+        ],
     }
+
+
+async def test_sender_controlled_fields_are_cut_when_the_list_is_read():
+    def handler(request):
+        return httpx.Response(200, json={"data": [
+            {"id": 1, "subject": "S" * 100_000, "from_name": "N" * 5000, "summary": "y" * 9000, "body": "b" * 50_000},
+            {"id": 2, "subject": "Normal subject", "from_name": "Ann"},
+        ], "nextCursor": None})
+
+    big, normal = await engine(handler).recent_rows()
+    assert (len(big["subject"]), len(big["from_name"]), len(big["summary"]), len(big["body"])) == (500, 200, 1000, 20_000)
+    assert big["subject"] == "S" * 500
+    assert (normal["subject"], normal["from_name"]) == ("Normal subject", "Ann")
 
 
 async def test_recent_rows_stops_at_the_cap():

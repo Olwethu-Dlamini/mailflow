@@ -13,9 +13,11 @@ import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Annotated
 
 import httpx
 from fastapi import Depends, FastAPI, Request
+from fastapi import Path as PathParam
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, StrictBool
@@ -86,6 +88,8 @@ class Labels(BaseModel):
 
 
 STATUS_DONE_TEXT = {"open": "reopened it", "waiting": "marked it Waiting on customer", "done": "marked it Done"}
+# An n8n row id as it may appear in a path: what SQLite can store, so no request can make it fail.
+RowId = Annotated[int, PathParam(ge=1, le=2**63 - 1)]
 PRIORITIES = ("P1", "P2", "P3")
 
 
@@ -107,18 +111,19 @@ def _user_json(user: User) -> dict:
     }
 
 
-def _pages() -> dict[str, str]:
-    """The HTML pages with every /static/ link stamped with a hash of the static files.
+def _pages() -> tuple[dict[str, str], str]:
+    """The HTML pages with every /static/ link stamped with a hash of the static files, and that hash.
 
     A stamped file never changes under its address, so browsers (and Cloudflare) keep it for a year
     and a repeat visit loads no CSS or JS at all; a deploy changes the hash, so nobody runs old code.
     """
     files = sorted(p for p in STATIC.iterdir() if p.is_file() and p.suffix != ".html")
     version = hashlib.sha256(b"".join(p.name.encode() + p.read_bytes() for p in files)).hexdigest()[:12]
-    return {
+    pages = {
         name: re.sub(r'((?:href|src)="/static/[^"?]+)"', rf'\1?v={version}"', (STATIC / name).read_text())
         for name in ("index.html", "login.html", "welcome.html")
     }
+    return pages, version
 
 
 def create_app(
@@ -133,6 +138,14 @@ def create_app(
     n8n_admin = n8n_admin or N8nAdmin(settings)
     outside = outside or httpx.AsyncClient(timeout=httpx.Timeout(20.0))  # AI providers and Telegram
     vault = Vault(settings.secret_key)
+    # Over https the "__Host-" prefix ties the session cookie to this exact host, so a sibling
+    # subdomain cannot plant its own; plain-http testing cannot use the prefixes.
+    cookie = f"__Host-{COOKIE}" if settings.cookie_secure else COOKIE
+    google_cookie = f"__Secure-{GOOGLE_COOKIE}" if settings.cookie_secure else GOOGLE_COOKIE
+
+    def _forget(response, name: str, path: str):
+        # A prefixed cookie is only replaced by one with the same Secure flag.
+        response.delete_cookie(name, path=path, secure=settings.cookie_secure, httponly=True)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -194,7 +207,9 @@ def create_app(
         # (Signed out, / is the public welcome page; it varies with the cookie, so it is not stored either.)
         if request.url.path.startswith(("/api/", "/auth/")) or request.url.path == "/":
             response.headers["Cache-Control"] = "no-store"
-        elif request.url.path.startswith("/static/") and "v" in request.query_params:
+        elif request.url.path.startswith("/static/") and request.query_params.get("v") == version and response.status_code == 200:
+            # Only this version's files: an old or future ?v, or a missing file, must not stay in a
+            # shared cache for a year (the next version's hash can be worked out from the source).
             response.headers["Cache-Control"] = YEAR
         elif request.url.path.startswith("/static/") or request.url.path == "/login":
             # The sign-in page and unstamped files: re-check with the server on every load.
@@ -225,7 +240,7 @@ def create_app(
         return JSONResponse({"error": str(error)}, 400)
 
     def current_user(request: Request) -> User:
-        user = auth.session_user(store, request.cookies.get(COOKIE, ""), clock())
+        user = auth.session_user(store, request.cookies.get(cookie, ""), clock())
         if user is None:
             raise ApiError(401, "Please log in.")
         return user
@@ -241,13 +256,13 @@ def create_app(
     def healthz():
         return {"ok": True}
 
-    pages = _pages()
+    pages, version = _pages()
     if google is not None:  # the sign-in page shows "Continue with Google" from the first paint
         pages["login.html"] = pages["login.html"].replace("data-google hidden", "data-google")
 
     @app.get("/")
     async def index(request: Request):
-        user = auth.session_user(store, request.cookies.get(COOKIE, ""), clock())
+        user = auth.session_user(store, request.cookies.get(cookie, ""), clock())
         if user is None:  # the public page that says what MailFlow is and how it works
             return HTMLResponse(pages["welcome.html"])
         # The account, the list and the open email ride along with the page, so it shows them
@@ -256,7 +271,8 @@ def create_app(
         boot = {"me": _user_json(user), "google": google is not None}
         if engine.ready:
             boot["inbox"] = await _inbox_json(q.get("view", "reply"), q.get("mailbox", ""), q.get("topic", ""), q.get("sender", ""), user)
-            row = engine.cached_row(int(q["id"])) if q.get("id", "").isdigit() else None
+            wanted = q.get("id", "")
+            row = engine.cached_row(int(wanted)) if wanted.isascii() and wanted.isdigit() and len(wanted) <= 18 else None
             if row is not None:
                 boot["email"] = _email_json(row)
         # As data, not script (the CSP runs none inline); "<" escaped so no text can close the tag.
@@ -273,7 +289,7 @@ def create_app(
 
     def _with_session(response, token: str):
         response.set_cookie(
-            COOKIE, token, max_age=auth.MAX_SECONDS, httponly=True, secure=settings.cookie_secure, samesite="strict", path="/"
+            cookie, token, max_age=auth.MAX_SECONDS, httponly=True, secure=settings.cookie_secure, samesite="strict", path="/"
         )
         return response
 
@@ -282,14 +298,15 @@ def create_app(
         try:
             token, user = auth.login(store, body.email, body.password, client_ip(request), clock())
         except auth.LoginRefused as refused:
-            raise ApiError(401, str(refused)) from None
+            raise ApiError(429 if str(refused) == auth.BUSY else 401, str(refused)) from None
+        auth.logout(store, request.cookies.get(cookie, ""))  # a session this browser had before ends now
         return _with_session(JSONResponse(_user_json(user)), token)
 
     # Continue with Google. Failures go back to the login page with a short code it explains.
 
     def _google_failed(code: str) -> RedirectResponse:
         response = RedirectResponse(f"/login?error={code}", 303)
-        response.delete_cookie(GOOGLE_COOKIE, path="/auth/google")
+        _forget(response, google_cookie, "/auth/google")
         return response
 
     @app.get("/auth/google")
@@ -297,11 +314,14 @@ def create_app(
         if google is None:
             raise ApiError(404, "Google sign-in is not set up.")
         start = google.start()
-        auth.google_begin(store, start.state, start.verifier, start.nonce, clock())
+        try:
+            auth.google_begin(store, start.state, start.verifier, start.nonce, clock())
+        except auth.LoginRefused:
+            return _google_failed("google_busy")
         response = RedirectResponse(start.url, 303)
         # Lax, not Strict: the browser must send it on Google's redirect back to the callback.
         response.set_cookie(
-            GOOGLE_COOKIE, start.state, max_age=auth.GOOGLE_START_SECONDS, httponly=True,
+            google_cookie, start.state, max_age=auth.GOOGLE_START_SECONDS, httponly=True,
             secure=settings.cookie_secure, samesite="lax", path="/auth/google",
         )
         return response
@@ -312,7 +332,7 @@ def create_app(
             raise ApiError(404, "Google sign-in is not set up.")
         if error:
             return _google_failed("google_denied")
-        mine = request.cookies.get(GOOGLE_COOKIE, "")
+        mine = request.cookies.get(google_cookie, "")
         # as bytes: compare_digest refuses str with non-ASCII characters, and ?state= is anyone's
         if not (state and mine and secrets.compare_digest(state.encode(), mine.encode())):
             return _google_failed("google_state")
@@ -331,14 +351,14 @@ def create_app(
             return _google_failed("google_no_account")
         log.info("%s signed in with Google", user.email)
         response = _with_session(HTMLResponse(SIGNED_IN_PAGE), token)
-        response.delete_cookie(GOOGLE_COOKIE, path="/auth/google")
+        _forget(response, google_cookie, "/auth/google")
         return response
 
     @app.post("/api/logout")
     def logout(request: Request):
-        auth.logout(store, request.cookies.get(COOKIE, ""))
+        auth.logout(store, request.cookies.get(cookie, ""))
         response = JSONResponse({"ok": True})
-        response.delete_cookie(COOKIE, path="/")
+        _forget(response, cookie, "/")
         return response
 
     @app.get("/api/me")
@@ -357,7 +377,7 @@ def create_app(
             raise ApiError(400, str(error)) from None
         store.set_password(user.id, auth.hash_password(body.new))
         response = JSONResponse({"ok": True})
-        response.delete_cookie(COOKIE, path="/")
+        _forget(response, cookie, "/")
         return response
 
     # email
@@ -400,11 +420,11 @@ def create_app(
         return row
 
     @app.get("/api/emails/{row_id}")
-    async def email(row_id: int, user: User = Depends(current_user)):
+    async def email(row_id: RowId, user: User = Depends(current_user)):
         return _email_json(await _row(row_id))
 
     @app.post("/api/emails/{row_id}/status")
-    async def set_status(row_id: int, body: StatusChange, user: User = Depends(current_user)):
+    async def set_status(row_id: RowId, body: StatusChange, user: User = Depends(current_user)):
         if body.to not in STATUSES:
             raise ApiError(400, "Unknown status.")
         await _row(row_id)
@@ -414,7 +434,7 @@ def create_app(
         return {"status": body.to}
 
     @app.post("/api/emails/{row_id}/reply")
-    async def reply(row_id: int, body: Reply, user: User = Depends(current_user)):
+    async def reply(row_id: RowId, body: Reply, user: User = Depends(current_user)):
         text = body.text.strip()
         if not text or len(text) > MAX_REPLY:
             raise ApiError(400, "Write a reply first (at most 20,000 characters).")
@@ -423,6 +443,10 @@ def create_app(
         if saved and saved.get("smtp"):
             await _reply_over_smtp(row, saved, text)
         elif row.get("mailbox") in REPLY_MAILBOXES:
+            # The id goes into the Reply workflow's Gmail search: only a well-formed Message-ID,
+            # never search words a sender put in the header.
+            if not mailer.MESSAGE_ID.fullmatch(str(row.get("message_id") or "")):
+                raise ApiError(400, "Not sent: this email has no usable Message-ID. Answer it from Gmail.")
             result = await engine.send_reply(row_id, row["message_id"], text)
             if result == "not_found":
                 raise ApiError(404, "Not sent: this email could not be found in Gmail.")
@@ -436,12 +460,13 @@ def create_app(
 
     async def _reply_over_smtp(row: dict, saved: dict, text: str) -> None:
         smtp = Smtp(**json.loads(saved["smtp"]))
-        message = mailer.reply_message(
-            smtp, row.get("from_name") or "", row.get("from_address") or "", row.get("subject") or "", row.get("message_id") or "", text
-        )
+        to_address = (row.get("from_address") or "").strip()
         try:
+            message = mailer.reply_message(
+                smtp, row.get("from_name") or "", to_address, row.get("subject") or "", row.get("message_id") or "", text
+            )
             password = vault.open(saved["smtp_secret"])
-            await asyncio.to_thread(mailer.send, smtp, password, message)
+            await asyncio.to_thread(mailer.send, smtp, password, message, to_address)
         except (MailError, VaultLocked) as error:
             raise ApiError(400, f"Not sent: {error}") from None
         try:  # sent: from here on a failure must not read as "not sent", or a retry sends it twice
@@ -450,11 +475,11 @@ def create_app(
             log.warning("reply to email %d sent, but its status stayed: %s", row["id"], error)
 
     @app.get("/api/emails/{row_id}/activity")
-    def activity(row_id: int, user: User = Depends(current_user)):
+    def activity(row_id: RowId, user: User = Depends(current_user)):
         return store.activity(row_id)
 
     @app.post("/api/emails/{row_id}/assign")
-    async def assign(row_id: int, body: Assign, user: User = Depends(current_user)):
+    async def assign(row_id: RowId, body: Assign, user: User = Depends(current_user)):
         current = store.assignee(row_id)
         # Staff take an email or let theirs go; giving one away, or taking someone else's, is an admin's.
         if not user.is_admin and (body.user_id not in (None, user.id) or current not in (None, user.id)):
@@ -476,7 +501,7 @@ def create_app(
         return {"assignee": body.user_id}
 
     @app.post("/api/emails/{row_id}/labels")
-    async def labels(row_id: int, body: Labels, user: User = Depends(current_user)):
+    async def labels(row_id: RowId, body: Labels, user: User = Depends(current_user)):
         if body.type is not None and body.type not in queue.TOPICS:
             raise ApiError(400, "Unknown topic.")
         if body.priority is not None and body.priority not in PRIORITIES:
@@ -551,6 +576,8 @@ def create_app(
         except ValueError as error:
             raise ApiError(400, str(error)) from None
         store.set_password(user.id, auth.hash_password(body.password))
+        # Recovery by an admin also drops the Google link: a wrong or stale link cannot outlive it.
+        store.unlink_google(user.id)
         return {"ok": True}
 
     integrations_api.add_routes(

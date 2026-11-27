@@ -9,7 +9,8 @@ const GOOGLE_ERRORS = {
   google_denied: "Google sign-in was cancelled.",
   google_state: "That Google sign-in expired or was started in another tab. Try again.",
   google_failed: "Google sign-in did not work. Try again, or use your password.",
-  google_no_account: "That Google account has no MailFlow access. Ask an admin to add your email address.",
+  google_no_account: "That Google account cannot open MailFlow. Ask an admin to add your email address, or sign in with your password (Google links itself only for Gmail and Google Workspace addresses).",
+  google_busy: "Too many sign-ins at once. Try again in a moment.",
 };
 
 function show(message, ok = false) {
@@ -20,7 +21,8 @@ function show(message, ok = false) {
 
 const query = new URLSearchParams(location.search);
 if (query.get("changed") === "1") show("Password changed. Sign in with the new one.", true);
-if (GOOGLE_ERRORS[query.get("error")]) show(GOOGLE_ERRORS[query.get("error")]);
+const googleError = query.get("error");
+if (Object.hasOwn(GOOGLE_ERRORS, googleError ?? "")) show(GOOGLE_ERRORS[googleError]);
 if (query.has("changed") || query.has("error")) history.replaceState(null, "", "/login");
 
 toggle.addEventListener("click", () => {

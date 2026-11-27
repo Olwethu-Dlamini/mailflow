@@ -48,7 +48,8 @@
         <span>Continue with Google</span>
       </a>
       <div id="or" class="or" data-google hidden>or with email</div>
-      <form id="login-form" novalidate>
+      <!-- method="post": if the script has not run yet, a native submit must not put the password in the URL -->
+      <form id="login-form" method="post" novalidate>
         <label>Email <input type="email" name="email" autocomplete="username" required autofocus></label>
         <label>Password
           <span class="pw">

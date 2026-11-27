@@ -34,6 +34,7 @@ class FakeGoogle:
         self.claims = {
             "iss": "https://accounts.google.com", "aud": GOOGLE.google_client_id, "sub": "1001",
             "email": "Staff@Example.com", "email_verified": True, "exp": NOW + 3600, "name": "Staff Member",
+            "hd": "example.com",  # a Workspace domain: Google is the authority for these addresses
         }
         self.nonce = None
         self.status = 200
@@ -250,3 +251,58 @@ def test_without_google_a_new_user_needs_a_password():
     response = client.post("/api/users", json={"email": "g@example.com", "name": "G", "password": "", "is_admin": False},
                            headers={"X-MailFlow": "1"})
     assert response.status_code == 400
+
+
+# --- linking only where Google owns the address (audit 2026-11-27) -----------------------------------
+
+
+@pytest.mark.parametrize("claims", [
+    {"hd": None},  # a consumer Google account on a company address Google does not host
+    {"hd": "other-company.example"},  # a Workspace domain, but not this address's
+])
+def test_a_first_google_sign_in_links_by_email_only_where_google_owns_the_address(world, claims):
+    client, fake, store = world
+    for key, value in claims.items():
+        if value is None:
+            fake.claims.pop(key)
+        else:
+            fake.claims[key] = value
+    response = callback(client, start(client, fake))
+    assert response.status_code == 303
+    assert response.headers["location"] == "/login?error=google_no_account"
+    assert store.user_by_email("staff@example.com").google_sub is None
+    assert client.get("/api/me").status_code == 401
+
+
+def test_a_gmail_address_links_without_a_workspace_domain(world):
+    client, fake, store = world
+    store.add_user("ann@gmail.com", "Ann", auth.hash_password(PASSWORD), is_admin=False)
+    fake.claims.pop("hd")
+    fake.claims.update(email="Ann@gmail.com", sub="4004")
+    assert callback(client, start(client, fake)).status_code == 200
+    assert client.get("/api/me").json()["email"] == "ann@gmail.com"
+    assert store.user_by_email("ann@gmail.com").google_sub == "4004"
+
+
+def test_an_admin_reset_ends_a_google_link(world):
+    client, fake, store = world
+    callback(client, start(client, fake))
+    assert store.user_by_email("staff@example.com").google_sub == "1001"
+    client.post("/api/logout", headers={"X-MailFlow": "1"})
+    client.post("/api/login", json={"email": "boss@example.com", "password": PASSWORD}, headers={"X-MailFlow": "1"})
+    staff = store.user_by_email("staff@example.com")
+    reset = client.post(f"/api/users/{staff.id}/reset", json={"password": "a brand new password"}, headers={"X-MailFlow": "1"})
+    assert reset.status_code == 200
+    assert store.user_by_email("staff@example.com").google_sub is None
+
+
+def test_sign_in_starts_expire_and_are_capped(world, monkeypatch):
+    client, fake, store = world
+    monkeypatch.setattr(auth, "GOOGLE_STARTS_CAP", 3)
+    for _ in range(3):
+        assert client.get("/auth/google", follow_redirects=False).headers["location"].startswith("https://accounts.google.com/")
+    refused = client.get("/auth/google", follow_redirects=False)
+    assert refused.headers["location"] == "/login?error=google_busy"
+    # Ten minutes on, the unused starts are gone and sign-in works again.
+    auth.google_begin(store, "later", "v", "n", NOW + auth.GOOGLE_START_SECONDS + 1)
+    assert store.take_google_start(auth._token_hash("later"), NOW) is not None

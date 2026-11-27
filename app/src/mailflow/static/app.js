@@ -1207,8 +1207,10 @@ $("add-user-form").addEventListener("submit", async (event) => {
 $("logout").addEventListener("click", async () => {
   try {
     await api("/api/logout", { method: "POST" });
-  } finally {
     location.href = "/login";
+  } catch (error) {
+    // Not signed out on the server: say so rather than show the sign-in page over a live session.
+    toast(`Not signed out: ${error.message}`, true);
   }
 });
 $("sync").addEventListener("click", render);
