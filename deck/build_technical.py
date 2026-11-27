@@ -175,6 +175,23 @@ text(s, MARGIN, TOP + Inches(3.45), CONTENT_W, Inches(0.8),
      "Answers: sent · cannot (not gmail, or empty) · not_found (not in Gmail). Other mailboxes: reply in the mail app, mark it on the page.",
      14, MUTED)
 
+# 10b -------------------------------------------------------------------------------------------
+s = d.slide("Integrations", "The admin sets up n8n from the page", (
+    "Integrations, in the admin menu, changes n8n through its public API, so nobody needs the n8n "
+    "editor for everyday setup. Connect a mailbox: the app signs in over IMAP to check, then creates "
+    "the n8n IMAP credential and a collector built like the hand-made ones, and switches it on. "
+    "Replies over SMTP leave from the app itself; the password is sealed in SQLite with "
+    "MAILFLOW_SECRET_KEY. The AI tab swaps the model in Process email, after saving a backup of the "
+    "workflow. Every step checks first and removes what it made if n8n refuses a later step."))
+picture(s, "app/integrations.png", x=MARGIN, y=TOP - Inches(0.15), max_w=Inches(5.6), max_h=Inches(4.9))
+table(s, MARGIN + Inches(5.9), TOP - Inches(0.1), [Inches(1.6), Inches(4.33)], [
+    ["Tab", "What the app does"],
+    ["Mailboxes", "IMAP login check → n8n credential + collector workflow → active. Pause, resume, remove its own."],
+    ["Replies", "SMTP login check; password sealed (Fernet, MAILFLOW_SECRET_KEY); sends with In-Reply-To + References."],
+    ["AI that sorts", "Ollama, Groq, OpenAI, Mistral cloud or Anthropic. Key checked first; Process email saved to n8n_backups before each change."],
+    ["Alerts", "Telegram bot + chat for P1 and errors; a new token sends a test message first."],
+], size=12, row_h=Inches(0.9))
+
 # 11 --------------------------------------------------------------------------------------------
 s = d.slide("Security", "Layer by layer", (
     "Security in layers. At the edge: HTTPS by Cloudflare, plain http redirected. Logins: one account "
@@ -196,6 +213,27 @@ table(s, MARGIN, TOP - Inches(0.1), [Inches(2.4), Inches(9.43)], [
     ["n8n", "Editor and API only on Tailscale; the Reply webhook needs its secret header (403 without)"],
 ], size=13, row_h=Inches(0.5))
 
+# 11b -------------------------------------------------------------------------------------------
+s = d.slide("Security audit", "0 confirmed findings; 10 leads closed in code", (
+    "A full security audit of the code found no confirmed vulnerability. It left ten leads: things that "
+    "could become a problem under the wrong conditions. Each was closed in the code anyway. The main "
+    "ones: failed logins are counted before the password is checked, so parallel guesses cannot pass "
+    "the limit. Google sign-in links an account only where Google owns the address. srv1 accepts only "
+    "the Cloudflare tunnel. Headers chosen by a sender are cut to a sane length."))
+table(s, MARGIN, TOP - Inches(0.15), [Inches(3.0), Inches(8.83)], [
+    ["Lead", "Closed by"],
+    ["Parallel login guesses", "Each attempt counted before its password is checked; at most 2 scrypt checks at a time (16 MiB each)"],
+    ["Google account linking", "First link only for a Gmail or Workspace address Google owns; an admin reset removes the link"],
+    ["Spoofed visitor address", "srv1's Caddy site accepts only the local Cloudflare tunnel, so Cf-Connecting-IP cannot be forged"],
+    ["Long sender headers", "New collectors cut subject, name, address and Message-ID; the hand-made ones were updated too"],
+    ["Big rows in memory", "The app cuts long fields when it reads the list (subject 500, body 20,000 characters)"],
+    ["Future-dated emails", "Kept out of the list (date at most a day ahead); collectors use the arrival time instead"],
+    ["Reply to a bad Message-ID", "A Gmail reply needs a well-formed Message-ID, and n8n's search also matches the sender"],
+    ["Password in the URL", "The sign-in form posts even before its script has run"],
+    ["Google sign-in clicks", "Unused sign-in starts expire after 10 minutes and are capped at 1,000"],
+    ["Stale cached code", "Static files cached for a year only under the current version's address"],
+], size=12, row_h=Inches(0.4))
+
 # 12 --------------------------------------------------------------------------------------------
 s = d.slide("Docker and deploying", "One container, one script", (
     "The app is one Docker container, built from app/Dockerfile and started by app/docker-compose.yml. "
@@ -206,7 +244,7 @@ s = d.slide("Docker and deploying", "One container, one script", (
 for i, (head, body, fg, bg) in enumerate([
     ("Container 'mailflow'", "python:3.13-slim, uvicorn on :8000 → published 10.0.0.31:3100. Network automation_default. Volume mailflow_data (/data). Healthcheck /healthz.", BLUE, BLUE_SOFT),
     ("Deploy / update", "On ai: sudo bash ~/mailflow-deploy.sh\nPulls /opt/mailflow, rebuilds, restarts, waits for healthy. The same command for every update.", GREEN, GREEN_SOFT),
-    ("Publish (done once)", "On srv1: app/deploy/srv1-publish.sh. Backs up, adds the tunnel line + Caddy block, validates (restores on failure), DNS, reloads.", SKY, SKY_SOFT),
+    ("Publish on srv1", "app/deploy/srv1-publish.sh, run again when it changes. Backs up, adds the tunnel line + a tunnel-only Caddy block, validates (restores on failure), DNS, reloads.", SKY, SKY_SOFT),
 ]):
     card(s, MARGIN + i * Inches(3.98), TOP - Inches(0.1), Inches(3.85), Inches(3.0), head, body, accent=fg,
          tint=bg, head_size=16, body_size=13)
@@ -277,14 +315,15 @@ table(s, MARGIN, TOP - Inches(0.1), [Inches(0.8), Inches(4.4), Inches(6.63)], [
 s = d.slide("Limits and next steps", "What is not done yet", (
     "What is not done yet, roughly in order of importance. Two things are now done: every MailFlow "
     "workflow sends its errors to Telegram, and a nightly cleanup deletes MailFlow's copies of emails "
-    "older than 90 days. Still open: replies work only for the Gmail mailbox. Mistral takes about "
+    "older than 90 days. Replies now work for any mailbox, over SMTP from the app. Still open: "
+    "Mistral takes about "
     "30 seconds an email, so a big burst queues; a cloud model would be faster but sends text out. "
     "The app's n8n API key can do everything in n8n, not just the table. And several emails "
     "processed at the same moment can be saved twice; collectors send one at a time, so this is rare."))
 for i, (head, body, fg, bg) in enumerate([
     ("Done: alerts + cleanup", "Failures → Telegram via 'MailFlow · Errors'. Every night at 02:00 rows older than 90 days are deleted (tested 20 Nov).", GREEN, GREEN_SOFT),
     ("Gmail sign-in", "If the Google app is still in Testing, the Gmail login expires every 7 days: publish it, or sign in again.", AMBER, AMBER_SOFT),
-    ("Replies: Gmail only", "Other mailboxes need a sender that keeps the thread (e.g. the DDOService bridge).", AMBER, AMBER_SOFT),
+    ("Replies: SMTP copies", "Replies over SMTP land in Sent at Gmail and Microsoft 365; other providers may not keep a copy.", AMBER, AMBER_SOFT),
     ("AI speed", "~30 s an email on Mistral; bursts queue. A cloud model is seconds but sends text out.", SKY, SKY_SOFT),
     ("Wide API key", "n8n API keys can do everything; scope it if n8n offers scopes, keep it on the server.", SKY, SKY_SOFT),
     ("Rare duplicates", "Two runs at the same moment can save one email twice; collectors send one at a time.", SKY, SKY_SOFT),

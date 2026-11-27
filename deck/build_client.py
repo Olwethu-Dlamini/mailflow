@@ -44,14 +44,22 @@ s = d.slide("What MailFlow does", "Collect, sort, work the queue, reply", (
     "MailFlow does four things. It collects every new email from every mailbox you connect, without "
     "changing anything in those mailboxes. It sorts each email: the topic, who sent it, how urgent it "
     "is, whether someone must reply, a one-line summary and the next step. Your team works one shared "
-    "queue: what needs a reply, most urgent first. And for Gmail mailboxes you reply right from "
-    "MailFlow; the answer lands in the same Gmail conversation."))
+    "queue: what needs a reply, most urgent first. And you reply right from MailFlow; the answer "
+    "lands in the same conversation."))
 flow(s, TOP + Inches(0.25), [
     ("Collect", "Every new email from every mailbox you connect. Your mailboxes stay as they are: nothing is moved, deleted or marked read."),
     ("Sort", "Topic, sender, priority P1-P3, needs a reply, a one-line summary and the next step, for every email."),
     ("Work the queue", "One shared inbox: what needs a reply, most urgent first. Mark replied or done so everyone knows."),
-    ("Reply", "Answer from MailFlow (Gmail mailboxes today); it lands in the same conversation. Urgent mail also pings your phone."),
+    ("Reply", "Answer from MailFlow, from any connected mailbox; it lands in the same conversation. Urgent mail also pings your phone."),
 ], h=Inches(3.5), body_size=14)
+
+# 3b --------------------------------------------------------------------------------------------
+s = d.slide("The welcome page", "What people see before they sign in", (
+    "Your MailFlow has its own address. Anyone who opens it first sees this page: what MailFlow is and "
+    "how it works in four steps, collect, sort, work the queue, reply and close. There is no sign-up "
+    "button. Only people your admin has added can sign in, with a password or with Google."),
+    subtitle="The public page at your MailFlow address. The four steps follow further down.")
+picture(s, "app/welcome.png", y=Inches(1.9), max_h=Inches(4.85))
 
 # 4 ---------------------------------------------------------------------------------------------
 s = d.slide("What your team sees", "One shared inbox, sorted for the event", (
@@ -122,8 +130,8 @@ s = d.slide("Reply and track", "Answer from MailFlow and let the team see it's h
     "Open an email and you see what it says, the AI's summary and next step, and a reply box. The "
     "reply is sent from your mailbox, in the same conversation, and the email moves to Waiting on "
     "customer, so the rest of the team sees it is handled. Mark it Done when it is finished, or Reopen "
-    "it. Today replies from the page work for Gmail mailboxes; for other mailboxes you reply in your "
-    "mail app and mark it here."))
+    "it. Replies leave from the mailbox the email came to: Gmail through Google, any other mailbox "
+    "once its outgoing mail (SMTP) is set up under Integrations."))
 picture(s, "app/reply-email.png", x=MARGIN, y=TOP - Inches(0.15), max_w=Inches(6), max_h=Inches(4.9))
 x0 = MARGIN + Inches(5.6)
 text(s, x0, TOP + Inches(0.05), Inches(3.8), Inches(0.35), "EVERY EMAIL MOVES THROUGH", 12, MUTED, True)
@@ -136,7 +144,7 @@ for i, (label, fg, bg, body) in enumerate([
     pill(s, x0, yy, label, fg=fg, bg=bg, size=13, w=Inches(2.3))
     text(s, x0, yy + Inches(0.42), Inches(3.8), Inches(0.4), body, 14, TEXT2)
 text(s, x0, TOP + Inches(3.5), Inches(3.8), Inches(1.0),
-     "Replies from the page: Gmail mailboxes today. Other mailboxes: reply in your mail app, mark it here.",
+     "Replies from the page work for any connected mailbox once its outgoing mail is set up.",
      13, MUTED)
 
 # 7b --------------------------------------------------------------------------------------------
@@ -153,6 +161,21 @@ bullets(s, MARGIN + Inches(6.4), TOP + Inches(0.2), Inches(5.4), Inches(4.6), [
     ("See the history. ", "Who took it, replied or marked it done, and when."),
     ("Fix the AI. ", "Change the priority, topic or needs-a-reply in one click."),
 ], size=17, spacing=14)
+
+# 7c --------------------------------------------------------------------------------------------
+s = d.slide("Integrations", "Your admin connects everything from the page", (
+    "An admin sets up MailFlow from the page, under Integrations, without help from us. Connect a "
+    "mailbox: pick Gmail, Microsoft 365 or another provider, give the sign-in and password, and "
+    "MailFlow checks it and starts collecting. Set up outgoing mail for a mailbox, and your team "
+    "replies from it in MailFlow. Choose the AI that sorts: on your own server, so mail never "
+    "leaves it, or a faster cloud service. And choose the Telegram chat that gets the urgent alerts."))
+picture(s, "app/integrations-ai.png", x=MARGIN, y=TOP - Inches(0.15), max_w=Inches(6.2), max_h=Inches(4.9))
+bullets(s, MARGIN + Inches(6.6), TOP + Inches(0.1), Inches(5.2), Inches(4.7), [
+    ("Connect mailboxes. ", "Gmail, Microsoft 365 or any IMAP mailbox. The sign-in is checked first."),
+    ("Reply from any mailbox. ", "Add its outgoing mail; replies stay in the same conversation."),
+    ("Choose the AI. ", "Your own server, or a cloud service. Switch back any time."),
+    ("Alerts. ", "Pick the Telegram chat for urgent mail; a test message is sent first."),
+], size=16, spacing=12)
 
 # 8 ---------------------------------------------------------------------------------------------
 s = d.slide("On the go", "Works on the organiser's phone", (
@@ -232,12 +255,12 @@ bullets(s, MARGIN, TOP + Inches(2.55), CONTENT_W, Inches(2.4), [
 
 # 12 --------------------------------------------------------------------------------------------
 s = d.slide("Getting started", "From your mailboxes to a working inbox", (
-    "Getting started takes three steps. First, connect your mailboxes: Gmail and any mailbox with IMAP "
-    "today; Microsoft 365 can be added. Second, we create a login for each organiser, and an admin on "
+    "Getting started takes three steps. First, connect your mailboxes: Gmail, Microsoft 365 or any "
+    "mailbox with IMAP, from the Integrations page. Second, we create a login for each organiser, and an admin on "
     "your side can add more. Third, we check the topics and priorities against your event, and you go "
     "live. Before the event we send test emails through it together, so your team has seen it work."))
 flow(s, TOP + Inches(0.2), [
-    ("Connect mailboxes", "Gmail and any IMAP mailbox today; Microsoft 365 can be added. Your mailboxes stay as they are."),
+    ("Connect mailboxes", "Gmail, Microsoft 365 or any IMAP mailbox, from Integrations. Your mailboxes stay as they are."),
     ("Team logins", "A login for each organiser; your admin adds or removes people any time."),
     ("Tune and go live", "We check topics and priorities against your event, send test emails together, and switch it on."),
 ], h=Inches(3.0), body_size=15)
