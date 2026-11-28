@@ -460,7 +460,7 @@ table.users tr.disabled .person { opacity: .55; }
   .list { height: 100%; border-right: 0; }
   .item { padding: 14px 16px; }
   .detail { display: none; height: 100%; }
-  .detail-bar { padding: 0 10px; }
+  .detail-bar { padding: 0 10px; overflow-x: auto; }
   .detail-bar kbd, .detail-bar .nav-arrows { display: none; }
   .detail-body { padding: 18px 16px 40px; }
   .sender { flex-wrap: wrap; row-gap: 2px; }
@@ -469,6 +469,11 @@ table.users tr.disabled .person { opacity: .55; }
   body.has-detail .detail { display: block; }
   .detail-bar .back { display: inline-grid; }
   dialog .grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  /* a phone's width: the status chip goes, and Waiting / Done show their icons only */
+  .detail-bar .chip.st, .detail-bar .btn-label { display: none; }
+  .detail-bar .btn { padding: 0 9px; }
 }
 
 /* ===== welcome: the public landing page at / for signed-out visitors ===== */
@@ -489,6 +494,15 @@ table.users tr.disabled .person { opacity: .55; }
 .wl-note { font-size: 14px; color: #c9c8f5; }
 .wl-preview { margin: 0; max-width: none; --neutral-soft: #f0f0f3; --muted: #545465; }
 .wl-section { padding: 72px 0; background: var(--bg); }
+/* the real product, in a window frame that rises into the hero */
+.wl-hero { padding-bottom: 136px; }
+.wl-showcase { margin-top: -96px; padding-bottom: 8px; }
+.wl-window { margin: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: var(--bg); box-shadow: var(--shadow-lg), 0 0 0 6px color-mix(in srgb, var(--accent) 10%, transparent); }
+.wl-window-bar { display: flex; gap: 6px; align-items: center; height: 30px; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--canvas); }
+.wl-window-bar span { width: 10px; height: 10px; border-radius: 50%; background: var(--line-strong); }
+.wl-window img { display: block; width: 100%; height: auto; }
+.wl-window figcaption { padding: 10px 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+@media (max-width: 600px) { .wl-hero { padding-bottom: 104px; } .wl-showcase { margin-top: -72px; } }
 .wl-alt { background: var(--canvas); border-top: 1px solid var(--line); }
 .wl-section h2 { margin: 0 0 32px; font-size: 28px; letter-spacing: -.02em; font-weight: 700; }
 .wl-section h3 { margin: 0 0 6px; font-size: 16px; font-weight: 650; }

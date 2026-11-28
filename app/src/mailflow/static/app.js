@@ -607,8 +607,8 @@ function neighbour(step) {
 
 function statusButtons(email) {
   return (BUTTONS[email.status] || BUTTONS.done).map(([to, label, cls, iconName, key, title]) =>
-    el("button", { type: "button", class: `btn ${cls}`, title, onclick: () => setStatus(email.id, to) },
-      icon(iconName), label, el("kbd", { text: key })));
+    el("button", { type: "button", class: `btn ${cls}`, title, "aria-label": label, onclick: () => setStatus(email.id, to) },
+      icon(iconName), el("span", { class: "btn-label", text: label }), el("kbd", { text: key })));
 }
 
 // Who has it: staff Take an email or Let go of theirs (key A); an admin picks anyone, or nobody.
