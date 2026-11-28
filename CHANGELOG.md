@@ -4,6 +4,10 @@ All notable changes to MailFlow. Dates are YYYY-MM-DD.
 
 ## Unreleased
 
+- The welcome page shows the real product (light or dark, as the device prefers).
+- On a phone, the open email's Waiting and Done buttons show as icons so the bar fits.
+- The sign-in page no longer says replies are Gmail-only.
+
 ## 1.0.0 - 2026-11-27
 
 The first release. It covers the work from 2026-11-16 to 2026-11-27.
